@@ -81,11 +81,11 @@ The comparative results of the trained models are summarized below (detailed in 
 | **LightGBM** | **Internal Test** | 60,002 | 0.999950 | **0.999950** | Passed |
 | **LightGBM** | **External (Generalization)** | 918,437 | 0.747131 | **0.706019** | **Best Stable Gen** |
 | XGBoost | External (Generalization) | 918,437 | 0.746584 | 0.704558 | Similar Generalization |
-| TCN (Temporal CNN) | External (Generalization) | 918,437 | 0.738991 | 0.685603 | Sequence-based Generalization |
+| Sequential Markov | External (Generalization) | 918,437 | 0.603821 | 0.422401 | Deterministic Sequence Model |
 
 ### Key Generalization Insights
 *   **Tree Generalization Limits**: Both LightGBM and XGBoost generalized consistently well on unseen attacks (around **0.706 Macro F1**), providing a strong balance of high precision (low False Positives, ~4%) with moderate detection rate.
-*   **Sequential Sequence Power**: The TCN (Temporal Convolutional Network) introduces a sliding window sequence mapping that analyzes sequential windows of consecutive flows, allowing it to capture temporal network behavior during domain shifts.
+*   **Sequential Sequence Power**: The **Sequential Markov Classifier** is 100% deterministic (no randomization) and tracks Markov transition probabilities $P(\text{state}_t \mid \text{state}_{t-1})$ over a rolling window. It achieves a very low False Positive Rate (**0.57%**), though its generalization recall is lower on out-of-distribution traffic.
 
 ---
 

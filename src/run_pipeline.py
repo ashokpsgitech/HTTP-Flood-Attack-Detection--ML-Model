@@ -14,9 +14,8 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 import lightgbm as lgb
 import xgboost as xgb
-import tensorflow as tf
-from tensorflow.keras import layers, Model
-from tensorflow.keras.optimizers import Adam
+from sklearn.preprocessing import KBinsDiscretizer
+from sklearn.decomposition import PCA
 
 from config import (
     CLASS_LABELS,
@@ -50,122 +49,83 @@ from data_utils import (
 )
 
 
-class TCNClassifier(BaseEstimator, ClassifierMixin):
-    def __init__(self, epochs=5, batch_size=512, window_size=5, learning_rate=0.001):
-        self.epochs = epochs
-        self.batch_size = batch_size
+class SequentialTransitionClassifier(BaseEstimator, ClassifierMixin):
+    def __init__(self, n_states=16, window_size=5):
+        self.n_states = n_states
         self.window_size = window_size
-        self.learning_rate = learning_rate
-        self.model = None
+        self.tree_partitioner = None
+        self.transition_matrices = {}
+        self.state_priors = {}
         self.classes_ = np.array([0, 1])
 
-    def _create_sequences(self, X, y=None):
-        X_seq = []
-        y_seq = []
-        w = min(self.window_size, len(X))
-        
-        # Loop for sequence windows
-        for i in range(len(X) - w + 1):
-            X_seq.append(X[i:i+w])
-            if y is not None:
-                y_seq.append(y[i+w-1])
-        
-        # Pad starting elements with zeros to maintain length alignment
-        padded_X = []
-        padded_y = []
-        for i in range(w - 1):
-            pad_len = w - 1 - i
-            padding = np.zeros((pad_len, X.shape[1]))
-            chunk = np.vstack([padding, X[0:i+1]])
-            padded_X.append(chunk)
-            if y is not None:
-                padded_y.append(y[i])
-        
-        X_seq = padded_X + X_seq
-        if y is not None:
-            y_seq = padded_y + y_seq
-            return np.array(X_seq), np.array(y_seq)
-        return np.array(X_seq)
-
     def fit(self, X, y):
-        np.random.seed(42)
-        tf.random.set_seed(42)
-        
         X_np = X.to_numpy() if hasattr(X, "to_numpy") else np.array(X)
         y_np = y.to_numpy() if hasattr(y, "to_numpy") else np.array(y)
-        
-        X_seq, y_seq = self._create_sequences(X_np, y_np)
-        
-        input_shape = (X_seq.shape[1], X_seq.shape[2])
-        inputs = layers.Input(shape=input_shape)
-        x = layers.Conv1D(filters=32, kernel_size=3, dilation_rate=1, padding='causal', activation='relu')(inputs)
-        x = layers.SpatialDropout1D(0.1)(x)
-        x = layers.Conv1D(filters=32, kernel_size=3, dilation_rate=2, padding='causal', activation='relu')(x)
-        x = layers.SpatialDropout1D(0.1)(x)
-        x = layers.GlobalAveragePooling1D()(x)
-        outputs = layers.Dense(1, activation='sigmoid')(x)
-        
-        self.model = Model(inputs, outputs)
-        self.model.compile(
-            optimizer=Adam(learning_rate=self.learning_rate),
-            loss='binary_crossentropy',
-            metrics=['accuracy']
-        )
-        
-        self.model.fit(
-            X_seq, y_seq,
-            epochs=self.epochs,
-            batch_size=self.batch_size,
-            verbose=0
-        )
-        return self
 
-    def predict(self, X):
-        X_np = X.to_numpy() if hasattr(X, "to_numpy") else np.array(X)
-        X_seq = self._create_sequences(X_np)
-        probas = self.model.predict(X_seq, batch_size=self.batch_size, verbose=0)
-        return (probas > 0.5).astype(int).flatten()
+        # 1. Deterministic Decision Tree to partition space into self.n_states regions
+        from sklearn.tree import DecisionTreeClassifier
+        self.tree_partitioner = DecisionTreeClassifier(max_leaf_nodes=self.n_states, random_state=42)
+        self.tree_partitioner.fit(X_np, y_np)
+        
+        # State IDs are the leaf indices
+        states = self.tree_partitioner.apply(X_np)
+        # Map leaf indices to 0..n_states-1 contiguous integers
+        self.leaf_map = {leaf: idx for idx, leaf in enumerate(np.unique(states))}
+        mapped_states = np.array([self.leaf_map[s] for s in states])
+
+        # 2. Estimate state priors and transitions for each class
+        for c in self.classes_:
+            c_indices = np.where(y_np == c)[0]
+            if len(c_indices) < 2:
+                self.transition_matrices[c] = np.ones((self.n_states, self.n_states)) / self.n_states
+                self.state_priors[c] = np.ones(self.n_states) / self.n_states
+                continue
+
+            state_counts = np.bincount(mapped_states[c_indices], minlength=self.n_states)
+            self.state_priors[c] = (state_counts + 1) / (len(c_indices) + self.n_states)
+
+            transitions = np.zeros((self.n_states, self.n_states))
+            for idx in range(len(c_indices) - 1):
+                i = c_indices[idx]
+                j = c_indices[idx + 1]
+                if j == i + 1:
+                    transitions[mapped_states[i], mapped_states[j]] += 1
+
+            row_sums = transitions.sum(axis=1, keepdims=True)
+            self.transition_matrices[c] = (transitions + 1) / (row_sums + self.n_states)
+
+        return self
 
     def predict_proba(self, X):
         X_np = X.to_numpy() if hasattr(X, "to_numpy") else np.array(X)
-        X_seq = self._create_sequences(X_np)
-        probas = self.model.predict(X_seq, batch_size=self.batch_size, verbose=0)
-        return np.hstack([1 - probas, probas])
+        raw_states = self.tree_partitioner.apply(X_np)
+        states = np.array([self.leaf_map.get(s, 0) for s in raw_states])
 
-    def __getstate__(self):
-        state = self.__dict__.copy()
-        if self.model is not None:
-            import tempfile
-            import os
-            fd, temp_path = tempfile.mkstemp(suffix='.h5')
-            try:
-                os.close(fd)
-                self.model.save(temp_path, save_format='h5')
-                with open(temp_path, 'rb') as f:
-                    model_bytes = f.read()
-                state['model_bytes'] = model_bytes
-            finally:
-                if os.path.exists(temp_path):
-                    os.remove(temp_path)
-            state['model'] = None
-        return state
+        log_likes = {c: np.zeros(len(states)) for c in self.classes_}
 
-    def __setstate__(self, state):
-        self.__dict__.update(state)
-        model_bytes = state.get('model_bytes', None)
-        if model_bytes is not None:
-            import tempfile
-            import os
-            fd, temp_path = tempfile.mkstemp(suffix='.h5')
-            try:
-                os.close(fd)
-                with open(temp_path, 'wb') as f:
-                    f.write(model_bytes)
-                from tensorflow.keras.models import load_model
-                self.model = load_model(temp_path)
-            finally:
-                if os.path.exists(temp_path):
-                    os.remove(temp_path)
+        for c in self.classes_:
+            P_trans = self.transition_matrices[c]
+            P_prior = self.state_priors[c]
+            
+            for idx in range(len(states)):
+                w_start = max(0, idx - self.window_size + 1)
+                w_states = states[w_start : idx + 1]
+                
+                log_p = np.log(P_prior[w_states[0]])
+                for t in range(1, len(w_states)):
+                    log_p += np.log(P_trans[w_states[t-1], w_states[t]])
+                log_likes[c][idx] = log_p
+
+        diff = log_likes[1] - log_likes[0]
+        diff = np.clip(diff, -50, 50)
+        prob_1 = 1 / (1 + np.exp(-diff))
+        
+        return np.vstack([1 - prob_1, prob_1]).T
+
+    def predict(self, X):
+        probas = self.predict_proba(X)
+        return np.argmax(probas, axis=1)
+
 
 
 def build_models(feature_columns):
@@ -233,12 +193,12 @@ def build_models(feature_columns):
                 ),
             ]
         ),
-        "tcn": Pipeline(
+        "sequential_markov": Pipeline(
             steps=[
                 ("preprocess", scaled_preprocessor),
                 (
                     "model",
-                    TCNClassifier(epochs=5, batch_size=512, window_size=5),
+                    SequentialTransitionClassifier(n_states=16, window_size=5),
                 ),
             ]
         ),
