@@ -77,15 +77,15 @@ The comparative results of the trained models are summarized below (detailed in 
 
 | Model | Split | Samples | Accuracy | Macro F1 | Status |
 | :--- | :--- | ---: | :---: | :---: | :--- |
-| **Logistic Regression** | **Validation** | 29,998 | 0.999767 | **0.999767** | **Selected Best Model** |
-| **Logistic Regression** | **Internal Test** | 60,002 | 0.999933 | **0.999933** | Passed |
-| **Logistic Regression** | **External (Generalization)** | 918,437 | 0.711091 | **0.709018** | **Best Generalization** |
-| HistGradientBoosting | External (Generalization) | 918,437 | 0.746162 | 0.705622 | Slower Generalization |
-| Random Forest | External (Generalization) | 918,437 | 0.650337 | 0.524544 | Poor Generalization |
+| **CatBoost** | **Validation** | 29,998 | 0.999833 | **0.999833** | **Selected Best Model** |
+| **CatBoost** | **Internal Test** | 60,002 | 0.999967 | **0.999967** | Passed |
+| **CatBoost** | **External (Generalization)** | 918,437 | 0.694121 | **0.675599** | Moderate Generalization |
+| LightGBM | External (Generalization) | 918,437 | 0.747131 | 0.706019 | Best Generalization |
+| XGBoost | External (Generalization) | 918,437 | 0.746584 | 0.704558 | Similar Generalization |
 
 ### Key Generalization Insights
-*   **Linear Model Superiority**: The linear model ([logistic_regression_baseline](file:///d:/HTTP%20flood%20attack/models/logistic_regression_baseline.joblib)) generalized best on unseen attacks (75.6% recall) by learning a linear rate-based decision boundary.
-*   **Tree Overfitting**: Tree-based models (Random Forest, GBDT) overfitted to the specific packet-size and port thresholds of HOIC and Hulk, yielding poor recall on the 2017 LOIC DDoS and slow-rate DoS attacks.
+*   **Best Generalizing Model**: **LightGBM** achieved the best generalization F1-macro score (**0.706019**) on the unseen external dataset, despite CatBoost performing slightly better on in-distribution validation data.
+*   **Overfitting Resistance**: CatBoost provided the highest validation and test accuracy internally (99.99%), showing extremely low variance, though its external domain generalization dropped slightly to **0.675599** Macro F1.
 
 ---
 
@@ -98,7 +98,7 @@ import joblib
 import pandas as pd
 
 # 1. Load the trained best binary model pipeline (includes the preprocessor steps)
-model = joblib.load("models/logistic_regression_baseline.joblib")
+model = joblib.load("models/final_model.joblib")
 
 # 2. Prepare new flow features as a pandas DataFrame (with correct aligned columns)
 # new_data = pd.DataFrame(...) 

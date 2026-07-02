@@ -1,7 +1,7 @@
 {
-  "best_model": "logistic_regression_baseline",
+  "best_model": "catboost",
   "selection_metric": "validation_f1_macro",
-  "validation_f1_macro": 0.9997666510973677,
+  "validation_f1_macro": 0.9998333222168508,
   "feature_columns": [
     "Dst Port",
     "Flow Duration",

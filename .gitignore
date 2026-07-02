@@ -18,3 +18,7 @@ results/confusion_matrices/
 # OS metadata
 .DS_Store
 Thumbs.db
+
+# CatBoost training files
+catboost_info/
+

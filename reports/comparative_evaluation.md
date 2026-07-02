@@ -1,15 +1,15 @@
 # Comparative Evaluation Report
 
-Selected final model: `logistic_regression_baseline` based on validation macro F1.
+Selected final model: `catboost` based on validation macro F1.
 
 | model | split | samples | accuracy | precision_macro | recall_macro | f1_macro | inference_latency_ms_per_sample | training_time_seconds |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| logistic_regression_baseline | external | 918437 | 0.711091 | 0.711282 | 0.717646 | 0.709018 | 0.001518 | 85.670578 |
-| hist_gradient_boosting | external | 918437 | 0.746162 | 0.792876 | 0.703267 | 0.705622 | 0.003192 | 8.594630 |
-| random_forest | external | 918437 | 0.650337 | 0.791321 | 0.579318 | 0.524544 | 0.003100 | 13.131189 |
-| logistic_regression_baseline | internal_test | 60002 | 0.999933 | 0.999933 | 0.999933 | 0.999933 | 0.001510 | 85.670578 |
-| hist_gradient_boosting | internal_test | 60002 | 0.999800 | 0.999800 | 0.999800 | 0.999800 | 0.003377 | 8.594630 |
-| random_forest | internal_test | 60002 | 0.994567 | 0.994625 | 0.994567 | 0.994567 | 0.003415 | 13.131189 |
-| logistic_regression_baseline | validation | 29998 | 0.999767 | 0.999767 | 0.999767 | 0.999767 | 0.001698 | 85.670578 |
-| hist_gradient_boosting | validation | 29998 | 0.999733 | 0.999733 | 0.999733 | 0.999733 | 0.003922 | 8.594630 |
-| random_forest | validation | 29998 | 0.996600 | 0.996623 | 0.996600 | 0.996600 | 0.003767 | 13.131189 |
+| lightgbm | external | 918437 | 0.747131 | 0.796479 | 0.703762 | 0.706019 | 0.002276 | 3.767310 |
+| xgboost | external | 918437 | 0.746584 | 0.798153 | 0.702634 | 0.704558 | 0.001779 | 4.299160 |
+| catboost | external | 918437 | 0.694121 | 0.685335 | 0.672938 | 0.675599 | 0.002060 | 6.577700 |
+| catboost | internal_test | 60002 | 0.999967 | 0.999967 | 0.999967 | 0.999967 | 0.001845 | 6.577700 |
+| lightgbm | internal_test | 60002 | 0.999950 | 0.999950 | 0.999950 | 0.999950 | 0.002487 | 3.767310 |
+| xgboost | internal_test | 60002 | 0.999400 | 0.999401 | 0.999400 | 0.999400 | 0.002031 | 4.299160 |
+| catboost | validation | 29998 | 0.999833 | 0.999833 | 0.999833 | 0.999833 | 0.002202 | 6.577700 |
+| lightgbm | validation | 29998 | 0.999800 | 0.999800 | 0.999800 | 0.999800 | 0.002769 | 3.767310 |
+| xgboost | validation | 29998 | 0.999667 | 0.999667 | 0.999667 | 0.999667 | 0.002002 | 4.299160 |

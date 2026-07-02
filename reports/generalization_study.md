@@ -7,6 +7,6 @@ The external dataset is evaluated after normalizing labels and filtering to the 
 
 | model | samples | accuracy | precision_macro | recall_macro | f1_macro | inference_latency_ms_per_sample |
 | --- | --- | --- | --- | --- | --- | --- |
-| logistic_regression_baseline | 918437 | 0.711091 | 0.711282 | 0.717646 | 0.709018 | 0.001518 |
-| hist_gradient_boosting | 918437 | 0.746162 | 0.792876 | 0.703267 | 0.705622 | 0.003192 |
-| random_forest | 918437 | 0.650337 | 0.791321 | 0.579318 | 0.524544 | 0.003100 |
+| lightgbm | 918437 | 0.747131 | 0.796479 | 0.703762 | 0.706019 | 0.002276 |
+| xgboost | 918437 | 0.746584 | 0.798153 | 0.702634 | 0.704558 | 0.001779 |
+| catboost | 918437 | 0.694121 | 0.685335 | 0.672938 | 0.675599 | 0.002060 |

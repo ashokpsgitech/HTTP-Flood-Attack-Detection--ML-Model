@@ -4,13 +4,15 @@ from pathlib import Path
 import joblib
 import pandas as pd
 from sklearn.compose import ColumnTransformer
-from sklearn.ensemble import HistGradientBoostingClassifier, RandomForestClassifier
+from catboost import CatBoostClassifier
 from sklearn.feature_selection import VarianceThreshold
 from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import confusion_matrix
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
+import lightgbm as lgb
+import xgboost as xgb
 
 from config import (
     CLASS_LABELS,
@@ -45,23 +47,11 @@ from data_utils import (
 
 
 def build_models(feature_columns):
-    numeric_preprocessor_scaled = Pipeline(
-        steps=[
-            ("imputer", SimpleImputer(strategy="median")),
-            ("variance", VarianceThreshold()),
-            ("scaler", StandardScaler()),
-        ]
-    )
     numeric_preprocessor_tree = Pipeline(
         steps=[
             ("imputer", SimpleImputer(strategy="median")),
             ("variance", VarianceThreshold()),
         ]
-    )
-    scaled_preprocessor = ColumnTransformer(
-        transformers=[("numeric", numeric_preprocessor_scaled, feature_columns)],
-        remainder="drop",
-        verbose_feature_names_out=False,
     )
     tree_preprocessor = ColumnTransformer(
         transformers=[("numeric", numeric_preprocessor_tree, feature_columns)],
@@ -70,48 +60,58 @@ def build_models(feature_columns):
     )
 
     return {
-        "logistic_regression_baseline": Pipeline(
-            steps=[
-                ("preprocess", scaled_preprocessor),
-                (
-                    "model",
-                    LogisticRegression(
-                        max_iter=500,
-                        class_weight="balanced",
-                        solver="saga",
-                        n_jobs=-1,
-                        random_state=42,
-                    ),
-                ),
-            ]
-        ),
-        "random_forest": Pipeline(
+        "catboost": Pipeline(
             steps=[
                 ("preprocess", tree_preprocessor),
                 (
                     "model",
-                    RandomForestClassifier(
-                        n_estimators=160,
-                        max_depth=None,
-                        min_samples_leaf=2,
-                        class_weight="balanced_subsample",
-                        n_jobs=-1,
-                        random_state=42,
-                    ),
-                ),
-            ]
-        ),
-        "hist_gradient_boosting": Pipeline(
-            steps=[
-                ("preprocess", tree_preprocessor),
-                (
-                    "model",
-                    HistGradientBoostingClassifier(
+                    CatBoostClassifier(
+                        iterations=180,
                         learning_rate=0.08,
-                        max_iter=180,
-                        max_leaf_nodes=31,
-                        l2_regularization=0.05,
+                        depth=6,
+                        l2_leaf_reg=3,
+                        random_seed=42,
+                        verbose=0,
+                        thread_count=-1
+                    ),
+                ),
+            ]
+        ),
+        "lightgbm": Pipeline(
+            steps=[
+                ("preprocess", tree_preprocessor),
+                (
+                    "model",
+                    lgb.LGBMClassifier(
+                        learning_rate=0.08,
+                        n_estimators=180,
+                        max_depth=-1,
+                        num_leaves=31,
+                        reg_alpha=0.05,
+                        reg_lambda=0.05,
+                        class_weight="balanced",
+                        n_jobs=-1,
                         random_state=42,
+                        verbose=-1,
+                    ),
+                ),
+            ]
+        ),
+        "xgboost": Pipeline(
+            steps=[
+                ("preprocess", tree_preprocessor),
+                (
+                    "model",
+                    xgb.XGBClassifier(
+                        learning_rate=0.08,
+                        n_estimators=180,
+                        max_depth=10,
+                        reg_alpha=0.05,
+                        reg_lambda=0.05,
+                        scale_pos_weight=1,
+                        n_jobs=-1,
+                        random_state=42,
+                        eval_metric='logloss',
                     ),
                 ),
             ]
@@ -333,32 +333,87 @@ def dataframe_to_markdown(df):
 
 
 def main():
+    print("="*60)
+    print("STEP 1: Creating output directories")
+    print("="*60)
     ensure_dirs(REPORTS_DIR, RESULTS_DIR, MODELS_DIR, RESULTS_DIR / "confusion_matrices")
+    print(f"[OK] Created directories: {REPORTS_DIR}, {RESULTS_DIR}, {MODELS_DIR}")
 
+    print("\n" + "="*60)
+    print("STEP 2: Loading datasets")
+    print("="*60)
     allowed_labels = set(CLASS_LABELS)
+    print(f"Loading training dataset from: {TRAIN_DATASET}")
     train_df = load_dataset(TRAIN_DATASET, allowed_labels=allowed_labels, max_rows=MAX_ROWS, require_timestamp=True)
+    print(f"[OK] Training dataset loaded: {len(train_df)} rows")
+    
+    print(f"Loading external dataset from: {EXTERNAL_DATASET}")
     external_df = load_dataset(EXTERNAL_DATASET, allowed_labels=allowed_labels, max_rows=MAX_ROWS)
+    print(f"[OK] External dataset loaded: {len(external_df)} rows")
 
+    print("\n" + "="*60)
+    print("STEP 3: Performing temporal split")
+    print("="*60)
+    print(f"Split ratios: Train={TRAIN_SPLIT:.0%}, Validation={VALIDATION_SPLIT:.0%}, Test={TEST_SPLIT:.0%}")
     train_split_df, validation_df, test_df = temporal_split(train_df, TRAIN_SPLIT, VALIDATION_SPLIT)
-    train_split_df = remove_training_duplicates(train_split_df)
-    validation_df = remove_rows_seen_in_training(validation_df, train_split_df)
-    test_df = remove_rows_seen_in_training(test_df, train_split_df)
-    external_df = remove_rows_seen_in_training(external_df, train_split_df)
+    print(f"[OK] Train split: {len(train_split_df)} rows")
+    print(f"[OK] Validation split: {len(validation_df)} rows")
+    print(f"[OK] Test split: {len(test_df)} rows")
 
+    print("\n" + "="*60)
+    print("STEP 4: Removing duplicates and preventing leakage")
+    print("="*60)
+    print("Removing exact duplicates from training set...")
+    train_split_df = remove_training_duplicates(train_split_df)
+    print(f"[OK] Training set after deduplication: {len(train_split_df)} rows")
+    
+    print("Removing training rows from validation set...")
+    validation_df = remove_rows_seen_in_training(validation_df, train_split_df)
+    print(f"[OK] Validation set after leakage removal: {len(validation_df)} rows")
+    
+    print("Removing training rows from test set...")
+    test_df = remove_rows_seen_in_training(test_df, train_split_df)
+    print(f"[OK] Test set after leakage removal: {len(test_df)} rows")
+    
+    print("Removing training rows from external set...")
+    external_df = remove_rows_seen_in_training(external_df, train_split_df)
+    print(f"[OK] External set after leakage removal: {len(external_df)} rows")
+
+    print("\n" + "="*60)
+    print("STEP 5: Selecting compatible features")
+    print("="*60)
     feature_columns = select_compatible_feature_columns(train_split_df, external_df)
     if not feature_columns:
         raise ValueError("No compatible feature columns found between training and external datasets.")
+    print(f"[OK] Found {len(feature_columns)} compatible features")
     dropped_training_only_features = [
         column
         for column in train_split_df.columns
         if column not in set(feature_columns) | {"Label", "Timestamp"}
     ]
+    if dropped_training_only_features:
+        print(f"[OK] Dropped training-only features: {', '.join(dropped_training_only_features)}")
+    else:
+        print("[OK] No training-only features to drop")
 
+    print("\n" + "="*60)
+    print("STEP 6: Preparing feature matrices and labels")
+    print("="*60)
     x_train, y_train, feature_columns = prepare_xy(train_split_df, feature_columns)
+    print(f"[OK] Training features: {x_train.shape}")
+    
     x_validation, y_validation, _ = prepare_xy(validation_df, feature_columns)
+    print(f"[OK] Validation features: {x_validation.shape}")
+    
     x_test, y_test, _ = prepare_xy(test_df, feature_columns)
+    print(f"[OK] Test features: {x_test.shape}")
+    
     x_external, y_external, _ = prepare_xy(external_df, feature_columns)
+    print(f"[OK] External features: {x_external.shape}")
 
+    print("\n" + "="*60)
+    print("STEP 7: Generating run metadata")
+    print("="*60)
     metadata = {
         "project_root": str(PROJECT_ROOT),
         "class_labels": CLASS_LABELS,
@@ -374,26 +429,40 @@ def main():
         ],
     }
     write_json(REPORTS_DIR / "run_metadata.json", metadata)
+    print(f"[OK] Metadata written to: {REPORTS_DIR / 'run_metadata.json'}")
+
+    print("\n" + "="*60)
+    print("STEP 8: Building model pipelines")
+    print("="*60)
+    models = build_models(feature_columns)
+    print(f"[OK] Built {len(models)} model pipelines: {', '.join(models.keys())}")
 
     all_metrics = []
     all_reports = []
     all_per_class = []
     validation_scores = {}
 
-    models = build_models(feature_columns)
+    print("\n" + "="*60)
+    print("STEP 9: Training and evaluating models")
+    print("="*60)
     for model_name, model in models.items():
+        print(f"\n{'-'*60}")
         print(f"Training {model_name}...")
+        print(f"{'-'*60}")
         start = time.perf_counter()
         model.fit(x_train, y_train)
         training_elapsed = time.perf_counter() - start
+        print(f"[OK] Training completed in {training_elapsed:.2f} seconds")
 
         joblib.dump(model, MODELS_DIR / f"{model_name}.joblib")
+        print(f"[OK] Model saved to: {MODELS_DIR / f'{model_name}.joblib'}")
 
         for split_name, x_split, y_split in [
             ("validation", x_validation, y_validation),
             ("internal_test", x_test, y_test),
             ("external", x_external, y_external),
         ]:
+            print(f"  Evaluating on {split_name} split ({len(x_split)} samples)...")
             metrics, report_df, conf_df, per_class_df, y_pred, y_proba = evaluate_model(
                 model_name,
                 model,
@@ -406,6 +475,7 @@ def main():
             all_reports.append(report_df)
             all_per_class.append(per_class_df)
             conf_df.to_csv(RESULTS_DIR / "confusion_matrices" / f"{model_name}_{split_name}.csv")
+            print(f"  [OK] {split_name} evaluation completed")
 
             # Calculate binary confusion metrics for FPR and FNR
             tn, fp, fn, tp = confusion_matrix(y_split, y_pred, labels=[0, 1]).ravel()
@@ -432,16 +502,34 @@ def main():
             if split_name == "validation":
                 validation_scores[model_name] = metrics["f1_macro"]
 
+    print("\n" + "="*60)
+    print("STEP 10: Saving evaluation results")
+    print("="*60)
     metrics_df = pd.DataFrame(all_metrics)
     reports_df = pd.concat(all_reports, ignore_index=True)
     per_class_df = pd.concat(all_per_class, ignore_index=True)
 
     metrics_df.to_csv(RESULTS_DIR / "metrics_summary.csv", index=False)
+    print(f"[OK] Metrics summary saved to: {RESULTS_DIR / 'metrics_summary.csv'}")
+    
     reports_df.to_csv(RESULTS_DIR / "classification_reports.csv", index=False)
+    print(f"[OK] Classification reports saved to: {RESULTS_DIR / 'classification_reports.csv'}")
+    
     per_class_df.to_csv(RESULTS_DIR / "per_class_tp_tn_fp_fn.csv", index=False)
+    print(f"[OK] Per-class metrics saved to: {RESULTS_DIR / 'per_class_tp_tn_fp_fn.csv'}")
 
+    print("\n" + "="*60)
+    print("STEP 11: Selecting and saving best model")
+    print("="*60)
     best_model_name = max(validation_scores, key=validation_scores.get)
+    print(f"Validation scores:")
+    for model, score in validation_scores.items():
+        marker = "<-- SELECTED" if model == best_model_name else ""
+        print(f"  {model}: {score:.6f} {marker}")
+    
     joblib.dump(models[best_model_name], MODELS_DIR / "final_model.joblib")
+    print(f"[OK] Best model ({best_model_name}) saved to: {MODELS_DIR / 'final_model.joblib'}")
+    
     write_json(
         MODELS_DIR / "final_model_metadata.json",
         {
@@ -453,7 +541,11 @@ def main():
             "class_labels": CLASS_LABELS,
         },
     )
+    print(f"[OK] Model metadata saved to: {MODELS_DIR / 'final_model_metadata.json'}")
 
+    print("\n" + "="*60)
+    print("STEP 12: Generating final predictions")
+    print("="*60)
     if WRITE_FINAL_PREDICTIONS:
         best_model = models[best_model_name]
         for split_name, x_split, y_split in [
@@ -461,14 +553,32 @@ def main():
             ("internal_test", x_test, y_test),
             ("external", x_external, y_external),
         ]:
+            print(f"  Generating predictions for {split_name} split...")
             y_pred, y_proba, _ = predict_with_timing(best_model, x_split)
             write_predictions(best_model_name, split_name, y_split, y_pred, y_proba)
+            print(f"  [OK] Predictions saved to: {RESULTS_DIR / f'predictions_{best_model_name}_{split_name}.csv'}")
+    else:
+        print("  (Prediction generation disabled)")
 
+    print("\n" + "="*60)
+    print("STEP 13: Generating markdown reports")
+    print("="*60)
     write_markdown_reports(metadata, all_metrics, best_model_name)
+    print(f"[OK] Dataset analysis report: {REPORTS_DIR / 'dataset_analysis.md'}")
+    print(f"[OK] Temporal split report: {REPORTS_DIR / 'temporal_split_report.md'}")
+    print(f"[OK] Leakage prevention report: {REPORTS_DIR / 'leakage_prevention.md'}")
+    print(f"[OK] Comparative evaluation report: {REPORTS_DIR / 'comparative_evaluation.md'}")
+    print(f"[OK] Balancing report: {REPORTS_DIR / 'balancing_report.md'}")
+    print(f"[OK] Generalization study report: {REPORTS_DIR / 'generalization_study.md'}")
+
+    print("\n" + "="*60)
+    print("PIPELINE COMPLETED SUCCESSFULLY")
+    print("="*60)
     print(f"Best model: {best_model_name}")
     print(f"Results written to: {RESULTS_DIR}")
     print(f"Reports written to: {REPORTS_DIR}")
     print(f"Models written to: {MODELS_DIR}")
+    print("="*60)
 
 
 if __name__ == "__main__":
