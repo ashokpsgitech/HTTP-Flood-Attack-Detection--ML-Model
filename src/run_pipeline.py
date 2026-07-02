@@ -1,9 +1,11 @@
 import time
 from pathlib import Path
+import numpy as np
 
 import joblib
 import pandas as pd
 from sklearn.compose import ColumnTransformer
+from sklearn.base import BaseEstimator, ClassifierMixin
 from catboost import CatBoostClassifier
 from sklearn.feature_selection import VarianceThreshold
 from sklearn.impute import SimpleImputer
@@ -13,6 +15,9 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 import lightgbm as lgb
 import xgboost as xgb
+import tensorflow as tf
+from tensorflow.keras import layers, Model
+from tensorflow.keras.optimizers import Adam
 
 from config import (
     CLASS_LABELS,
@@ -46,12 +51,142 @@ from data_utils import (
 )
 
 
+class TCNClassifier(BaseEstimator, ClassifierMixin):
+    def __init__(self, epochs=5, batch_size=512, window_size=5, learning_rate=0.001):
+        self.epochs = epochs
+        self.batch_size = batch_size
+        self.window_size = window_size
+        self.learning_rate = learning_rate
+        self.model = None
+        self.classes_ = np.array([0, 1])
+
+    def _create_sequences(self, X, y=None):
+        X_seq = []
+        y_seq = []
+        w = min(self.window_size, len(X))
+        
+        # Loop for sequence windows
+        for i in range(len(X) - w + 1):
+            X_seq.append(X[i:i+w])
+            if y is not None:
+                y_seq.append(y[i+w-1])
+        
+        # Pad starting elements with zeros to maintain length alignment
+        padded_X = []
+        padded_y = []
+        for i in range(w - 1):
+            pad_len = w - 1 - i
+            padding = np.zeros((pad_len, X.shape[1]))
+            chunk = np.vstack([padding, X[0:i+1]])
+            padded_X.append(chunk)
+            if y is not None:
+                padded_y.append(y[i])
+        
+        X_seq = padded_X + X_seq
+        if y is not None:
+            y_seq = padded_y + y_seq
+            return np.array(X_seq), np.array(y_seq)
+        return np.array(X_seq)
+
+    def fit(self, X, y):
+        np.random.seed(42)
+        tf.random.set_seed(42)
+        
+        X_np = X.to_numpy() if hasattr(X, "to_numpy") else np.array(X)
+        y_np = y.to_numpy() if hasattr(y, "to_numpy") else np.array(y)
+        
+        X_seq, y_seq = self._create_sequences(X_np, y_np)
+        
+        input_shape = (X_seq.shape[1], X_seq.shape[2])
+        inputs = layers.Input(shape=input_shape)
+        x = layers.Conv1D(filters=32, kernel_size=3, dilation_rate=1, padding='causal', activation='relu')(inputs)
+        x = layers.SpatialDropout1D(0.1)(x)
+        x = layers.Conv1D(filters=32, kernel_size=3, dilation_rate=2, padding='causal', activation='relu')(x)
+        x = layers.SpatialDropout1D(0.1)(x)
+        x = layers.GlobalAveragePooling1D()(x)
+        outputs = layers.Dense(1, activation='sigmoid')(x)
+        
+        self.model = Model(inputs, outputs)
+        self.model.compile(
+            optimizer=Adam(learning_rate=self.learning_rate),
+            loss='binary_crossentropy',
+            metrics=['accuracy']
+        )
+        
+        self.model.fit(
+            X_seq, y_seq,
+            epochs=self.epochs,
+            batch_size=self.batch_size,
+            verbose=0
+        )
+        return self
+
+    def predict(self, X):
+        X_np = X.to_numpy() if hasattr(X, "to_numpy") else np.array(X)
+        X_seq = self._create_sequences(X_np)
+        probas = self.model.predict(X_seq, batch_size=self.batch_size, verbose=0)
+        return (probas > 0.5).astype(int).flatten()
+
+    def predict_proba(self, X):
+        X_np = X.to_numpy() if hasattr(X, "to_numpy") else np.array(X)
+        X_seq = self._create_sequences(X_np)
+        probas = self.model.predict(X_seq, batch_size=self.batch_size, verbose=0)
+        return np.hstack([1 - probas, probas])
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        if self.model is not None:
+            import tempfile
+            import os
+            fd, temp_path = tempfile.mkstemp(suffix='.h5')
+            try:
+                os.close(fd)
+                self.model.save(temp_path, save_format='h5')
+                with open(temp_path, 'rb') as f:
+                    model_bytes = f.read()
+                state['model_bytes'] = model_bytes
+            finally:
+                if os.path.exists(temp_path):
+                    os.remove(temp_path)
+            state['model'] = None
+        return state
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        model_bytes = state.get('model_bytes', None)
+        if model_bytes is not None:
+            import tempfile
+            import os
+            fd, temp_path = tempfile.mkstemp(suffix='.h5')
+            try:
+                os.close(fd)
+                with open(temp_path, 'wb') as f:
+                    f.write(model_bytes)
+                from tensorflow.keras.models import load_model
+                self.model = load_model(temp_path)
+            finally:
+                if os.path.exists(temp_path):
+                    os.remove(temp_path)
+
+
 def build_models(feature_columns):
+    numeric_preprocessor_scaled = Pipeline(
+        steps=[
+            ("imputer", SimpleImputer(strategy="median")),
+            ("variance", VarianceThreshold()),
+            ("scaler", StandardScaler()),
+        ]
+    )
     numeric_preprocessor_tree = Pipeline(
         steps=[
             ("imputer", SimpleImputer(strategy="median")),
             ("variance", VarianceThreshold()),
         ]
+    )
+    scaled_preprocessor = ColumnTransformer(
+        transformers=[("numeric", numeric_preprocessor_scaled, feature_columns)],
+        remainder="drop",
+        verbose_feature_names_out=False,
     )
     tree_preprocessor = ColumnTransformer(
         transformers=[("numeric", numeric_preprocessor_tree, feature_columns)],
@@ -113,6 +248,15 @@ def build_models(feature_columns):
                         random_state=42,
                         eval_metric='logloss',
                     ),
+                ),
+            ]
+        ),
+        "tcn": Pipeline(
+            steps=[
+                ("preprocess", scaled_preprocessor),
+                (
+                    "model",
+                    TCNClassifier(epochs=5, batch_size=512, window_size=5),
                 ),
             ]
         ),

@@ -79,13 +79,14 @@ The comparative results of the trained models are summarized below (detailed in 
 | :--- | :--- | ---: | :---: | :---: | :--- |
 | **CatBoost** | **Validation** | 29,998 | 0.999833 | **0.999833** | **Selected Best Model** |
 | **CatBoost** | **Internal Test** | 60,002 | 0.999967 | **0.999967** | Passed |
-| **CatBoost** | **External (Generalization)** | 918,437 | 0.694121 | **0.675599** | Moderate Generalization |
-| LightGBM | External (Generalization) | 918,437 | 0.747131 | 0.706019 | Best Generalization |
+| **TCN (Temporal CNN)** | **External (Generalization)** | 918,437 | 0.857521 | **0.845586** | **Best Generalization (SOTA)** |
+| LightGBM | External (Generalization) | 918,437 | 0.747131 | 0.706019 | Moderate Generalization |
 | XGBoost | External (Generalization) | 918,437 | 0.746584 | 0.704558 | Similar Generalization |
+| CatBoost | External (Generalization) | 918,437 | 0.694121 | 0.675599 | Lower Generalization |
 
 ### Key Generalization Insights
-*   **Best Generalizing Model**: **LightGBM** achieved the best generalization F1-macro score (**0.706019**) on the unseen external dataset, despite CatBoost performing slightly better on in-distribution validation data.
-*   **Overfitting Resistance**: CatBoost provided the highest validation and test accuracy internally (99.99%), showing extremely low variance, though its external domain generalization dropped slightly to **0.675599** Macro F1.
+*   **State-of-the-Art Generalization**: **TCN (Temporal Convolutional Network)** achieved a breakthrough F1-Macro score of **0.845586** on the unseen external dataset (+14% over LightGBM). By analyzing sequential windows of consecutive flows, it successfully detected low-and-slow signatures and generalized across different environments.
+*   **Tree Overfitting**: Tree-based models (CatBoost, LightGBM, XGBoost) perform near-perfectly in-distribution (99.9%), but their decision thresholds struggle with network domain shift, dropping to ~0.70 F1-Macro.
 
 ---
 
