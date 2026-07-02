@@ -14,26 +14,49 @@ The model is trained as a **binary classifier** separating legitimate web traffi
 *   **Per-Class Temporal Splitting**: To avoid disjoint class distributions across splits (arising from chronological attack recordings), data splitting in [data_utils.py](file:///d:/HTTP%20flood%20attack/src/data_utils.py#L93-L125) is performed temporally *within* each class (70% train, 10% validation, 20% test) before merging, preserving chronological integrity without losing class representation.
 *   **Zero Leakage**: All scaling, imputing, and preprocessing steps are fit exclusively on the training split and applied to the validation, test, and external sets.
 *   **Oversampling-Free Balancing**: The training dataset uses 150,000 unique `Benign` rows and 150,000 unique `Attack` rows (sampled strictly without replacement) to avoid introducing duplicate rows into the learning loop.
+*   **Pre-processed Datasets**: The training and external datasets are provided in compressed format and must be extracted before running the pipeline. No dataset merging or preprocessing is required.
 
 ---
 
 ## 2. Dataset Overview
 
-The datasets are stored in the [datasets/](file:///d:/HTTP%20flood%20attack/datasets/) directory:
+The datasets are provided in compressed format in the [datasets/](file:///d:/HTTP%20flood%20attack/datasets/) directory. The `.rar` files are tracked in version control, while the extracted `.csv` files are gitignored and must be extracted locally before running the pipeline:
 
-1.  **Training & Internal Validation**: [training_binary.csv](file:///d:/HTTP%20flood%20attack/datasets/training_binary.csv) (300,000 rows, balanced 150,000 Benign vs. 150,000 Attack (composed of 75,000 unique Hulk and 75,000 unique HOIC flows)).
-2.  **External Generalization**: [DDos_pcap_binary_external.csv](file:///d:/HTTP%20flood%20attack/datasets/DDos_pcap_binary_external.csv) (918,437 rows, containing Wednesday and Friday afternoon PCAP flows, with all attacks mapped to the `Attack` class).
+1.  **Training & Internal Validation**: `training_binary.csv` (300,000 rows, balanced 150,000 Benign vs. 150,000 Attack (composed of 75,000 unique Hulk and 75,000 unique HOIC flows)).
+    - Source: CSE-CIC-IDS2018 (February 15-21, 2018)
+    - Time range: 2018-02-15 01:00:01 to 2018-02-21 10:42:39
+    - Compressed file: `datasets/training_binary.rar`
+
+2.  **External Generalization**: `DDos_pcap_binary_external.csv` (918,437 rows, containing Wednesday and Friday afternoon PCAP flows, with all attacks mapped to the `Attack` class).
+    - Source: CICIDS2017 (Wednesday + Friday afternoon PCAPs)
+    - Contains LOIC DDoS and slow-rate attacks for generalization testing
+    - Compressed files: `datasets/DDos_pcap_binary_external.part1.rar` and `part2.rar`
 
 ---
 
 ## 3. How to Run
 
-### Step 1: Generate the Datasets
-Run the dataset merge and alignment script to build the datasets from the raw downloaded archive in `C:\Users\ashok\Downloads\archive\`:
+### Step 1: Extract the Datasets
+The compressed dataset files are located in the `datasets/` directory. Extract them in-place before running the pipeline:
+
+**Windows:**
 ```powershell
-& 'C:\Users\ashok\AppData\Local\Programs\Python\Python310\python.exe' src/merge_datasets_binary.py
+# Extract training dataset
+& "C:\Program Files\WinRAR\WinRAR.exe" x "datasets/training_binary.rar" "datasets/"
+
+# Extract external dataset (multi-part archive)
+& "C:\Program Files\WinRAR\WinRAR.exe" x "datasets/DDos_pcap_binary_external.part1.rar" "datasets/"
 ```
-This writes the output files directly to the `datasets/` folder.
+
+**Or use 7-Zip:**
+```powershell
+& "C:\Program Files\7-Zip\7z.exe" x "datasets/training_binary.rar" -odatasets\
+& "C:\Program Files\7-Zip\7z.exe" x "datasets/DDos_pcap_binary_external.part1.rar" -odatasets\
+```
+
+After extraction, you should have:
+- `datasets/training_binary.csv` (300,000 rows)
+- `datasets/DDos_pcap_binary_external.csv` (918,437 rows)
 
 ### Step 2: Train and Evaluate the Models
 Run the training pipeline to train the baseline and advanced classifiers, save model artifacts, and generate comparative reports:

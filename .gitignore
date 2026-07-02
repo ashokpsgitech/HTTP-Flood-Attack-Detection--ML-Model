@@ -6,9 +6,10 @@ __pycache__/
 # Large model binaries
 models/*.joblib
 
-# Raw dataset CSVs (too large for GitHub - use datasets/compressed/ instead)
+# Raw dataset CSVs (too large for GitHub - use .rar files instead)
 datasets/*.csv
-!datasets/compressed/
+# Allow .rar files in datasets/ for version control
+!datasets/*.rar
 
 # Prediction files and matrices
 results/predictions_*.csv
