@@ -1,0 +1,19 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Large model binaries
+models/*.joblib
+
+# Raw dataset CSVs (too large for GitHub - use datasets/compressed/ instead)
+datasets/*.csv
+!datasets/compressed/
+
+# Prediction files and matrices
+results/predictions_*.csv
+results/confusion_matrices/
+
+# OS metadata
+.DS_Store
+Thumbs.db
