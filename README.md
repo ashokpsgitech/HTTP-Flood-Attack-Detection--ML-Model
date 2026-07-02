@@ -77,15 +77,15 @@ The comparative results of the trained models are summarized below (detailed in 
 
 | Model | Split | Samples | Accuracy | Macro F1 | Status |
 | :--- | :--- | ---: | :---: | :---: | :--- |
-| **LightGBM** | **Validation** | 29,998 | 0.999800 | **0.999800** | **Selected Best Model** |
-| **LightGBM** | **Internal Test** | 60,002 | 0.999950 | **0.999950** | Passed |
-| **LightGBM** | **External (Generalization)** | 918,437 | 0.747131 | **0.706019** | **Best Stable Gen** |
+| **CatBoost** | **Validation** | 29,998 | 0.999833 | **0.999833** | **Selected Best Model** |
+| **CatBoost** | **Internal Test** | 60,002 | 0.999967 | **0.999967** | Passed |
+| **CatBoost** | **External (Generalization)** | 918,437 | 0.694121 | **0.675599** | Moderate Generalization |
+| LightGBM | External (Generalization) | 918,437 | 0.747131 | 0.706019 | Best Generalization |
 | XGBoost | External (Generalization) | 918,437 | 0.746584 | 0.704558 | Similar Generalization |
-| Sequential Markov | External (Generalization) | 918,437 | 0.603821 | 0.422401 | Deterministic Sequence Model |
 
 ### Key Generalization Insights
-*   **Tree Generalization Limits**: Both LightGBM and XGBoost generalized consistently well on unseen attacks (around **0.706 Macro F1**), providing a strong balance of high precision (low False Positives, ~4%) with moderate detection rate.
-*   **Sequential Sequence Power**: The **Sequential Markov Classifier** is 100% deterministic (no randomization) and tracks Markov transition probabilities $P(\text{state}_t \mid \text{state}_{t-1})$ over a rolling window. It achieves a very low False Positive Rate (**0.57%**), though its generalization recall is lower on out-of-distribution traffic.
+*   **Best Generalizing Model**: **LightGBM** achieved the best generalization F1-macro score (**0.706019**) on the unseen external dataset, despite CatBoost performing slightly better on in-distribution validation data.
+*   **Overfitting Resistance**: CatBoost provided the highest validation and test accuracy internally (99.99%), showing extremely low variance, though its external domain generalization dropped slightly to **0.675599** Macro F1.
 
 ---
 

@@ -14,8 +14,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 import lightgbm as lgb
 import xgboost as xgb
-from sklearn.preprocessing import KBinsDiscretizer
-from sklearn.decomposition import PCA
+from catboost import CatBoostClassifier
 
 from config import (
     CLASS_LABELS,
@@ -49,82 +48,6 @@ from data_utils import (
 )
 
 
-class SequentialTransitionClassifier(BaseEstimator, ClassifierMixin):
-    def __init__(self, n_states=16, window_size=5):
-        self.n_states = n_states
-        self.window_size = window_size
-        self.tree_partitioner = None
-        self.transition_matrices = {}
-        self.state_priors = {}
-        self.classes_ = np.array([0, 1])
-
-    def fit(self, X, y):
-        X_np = X.to_numpy() if hasattr(X, "to_numpy") else np.array(X)
-        y_np = y.to_numpy() if hasattr(y, "to_numpy") else np.array(y)
-
-        # 1. Deterministic Decision Tree to partition space into self.n_states regions
-        from sklearn.tree import DecisionTreeClassifier
-        self.tree_partitioner = DecisionTreeClassifier(max_leaf_nodes=self.n_states, random_state=42)
-        self.tree_partitioner.fit(X_np, y_np)
-        
-        # State IDs are the leaf indices
-        states = self.tree_partitioner.apply(X_np)
-        # Map leaf indices to 0..n_states-1 contiguous integers
-        self.leaf_map = {leaf: idx for idx, leaf in enumerate(np.unique(states))}
-        mapped_states = np.array([self.leaf_map[s] for s in states])
-
-        # 2. Estimate state priors and transitions for each class
-        for c in self.classes_:
-            c_indices = np.where(y_np == c)[0]
-            if len(c_indices) < 2:
-                self.transition_matrices[c] = np.ones((self.n_states, self.n_states)) / self.n_states
-                self.state_priors[c] = np.ones(self.n_states) / self.n_states
-                continue
-
-            state_counts = np.bincount(mapped_states[c_indices], minlength=self.n_states)
-            self.state_priors[c] = (state_counts + 1) / (len(c_indices) + self.n_states)
-
-            transitions = np.zeros((self.n_states, self.n_states))
-            for idx in range(len(c_indices) - 1):
-                i = c_indices[idx]
-                j = c_indices[idx + 1]
-                if j == i + 1:
-                    transitions[mapped_states[i], mapped_states[j]] += 1
-
-            row_sums = transitions.sum(axis=1, keepdims=True)
-            self.transition_matrices[c] = (transitions + 1) / (row_sums + self.n_states)
-
-        return self
-
-    def predict_proba(self, X):
-        X_np = X.to_numpy() if hasattr(X, "to_numpy") else np.array(X)
-        raw_states = self.tree_partitioner.apply(X_np)
-        states = np.array([self.leaf_map.get(s, 0) for s in raw_states])
-
-        log_likes = {c: np.zeros(len(states)) for c in self.classes_}
-
-        for c in self.classes_:
-            P_trans = self.transition_matrices[c]
-            P_prior = self.state_priors[c]
-            
-            for idx in range(len(states)):
-                w_start = max(0, idx - self.window_size + 1)
-                w_states = states[w_start : idx + 1]
-                
-                log_p = np.log(P_prior[w_states[0]])
-                for t in range(1, len(w_states)):
-                    log_p += np.log(P_trans[w_states[t-1], w_states[t]])
-                log_likes[c][idx] = log_p
-
-        diff = log_likes[1] - log_likes[0]
-        diff = np.clip(diff, -50, 50)
-        prob_1 = 1 / (1 + np.exp(-diff))
-        
-        return np.vstack([1 - prob_1, prob_1]).T
-
-    def predict(self, X):
-        probas = self.predict_proba(X)
-        return np.argmax(probas, axis=1)
 
 
 
@@ -193,12 +116,20 @@ def build_models(feature_columns):
                 ),
             ]
         ),
-        "sequential_markov": Pipeline(
+        "catboost": Pipeline(
             steps=[
-                ("preprocess", scaled_preprocessor),
+                ("preprocess", tree_preprocessor),
                 (
                     "model",
-                    SequentialTransitionClassifier(n_states=16, window_size=5),
+                    CatBoostClassifier(
+                        iterations=180,
+                        learning_rate=0.08,
+                        depth=6,
+                        l2_leaf_reg=3,
+                        random_seed=42,
+                        verbose=0,
+                        thread_count=-1
+                    ),
                 ),
             ]
         ),

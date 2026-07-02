@@ -1,7 +1,7 @@
 {
-  "best_model": "lightgbm",
+  "best_model": "catboost",
   "selection_metric": "validation_f1_macro",
-  "validation_f1_macro": 0.9997999866577761,
+  "validation_f1_macro": 0.9998333222168508,
   "feature_columns": [
     "Dst Port",
     "Flow Duration",
