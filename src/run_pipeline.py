@@ -6,7 +6,6 @@ import joblib
 import pandas as pd
 from sklearn.compose import ColumnTransformer
 from sklearn.base import BaseEstimator, ClassifierMixin
-from catboost import CatBoostClassifier
 from sklearn.feature_selection import VarianceThreshold
 from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression
@@ -195,23 +194,6 @@ def build_models(feature_columns):
     )
 
     return {
-        "catboost": Pipeline(
-            steps=[
-                ("preprocess", tree_preprocessor),
-                (
-                    "model",
-                    CatBoostClassifier(
-                        iterations=180,
-                        learning_rate=0.08,
-                        depth=6,
-                        l2_leaf_reg=3,
-                        random_seed=42,
-                        verbose=0,
-                        thread_count=-1
-                    ),
-                ),
-            ]
-        ),
         "lightgbm": Pipeline(
             steps=[
                 ("preprocess", tree_preprocessor),

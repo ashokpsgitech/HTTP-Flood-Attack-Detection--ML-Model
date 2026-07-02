@@ -77,16 +77,15 @@ The comparative results of the trained models are summarized below (detailed in 
 
 | Model | Split | Samples | Accuracy | Macro F1 | Status |
 | :--- | :--- | ---: | :---: | :---: | :--- |
-| **CatBoost** | **Validation** | 29,998 | 0.999833 | **0.999833** | **Selected Best Model** |
-| **CatBoost** | **Internal Test** | 60,002 | 0.999967 | **0.999967** | Passed |
-| **TCN (Temporal CNN)** | **External (Generalization)** | 918,437 | 0.857521 | **0.845586** | **Best Generalization (SOTA)** |
-| LightGBM | External (Generalization) | 918,437 | 0.747131 | 0.706019 | Moderate Generalization |
+| **LightGBM** | **Validation** | 29,998 | 0.999800 | **0.999800** | **Selected Best Model** |
+| **LightGBM** | **Internal Test** | 60,002 | 0.999950 | **0.999950** | Passed |
+| **LightGBM** | **External (Generalization)** | 918,437 | 0.747131 | **0.706019** | **Best Stable Gen** |
 | XGBoost | External (Generalization) | 918,437 | 0.746584 | 0.704558 | Similar Generalization |
-| CatBoost | External (Generalization) | 918,437 | 0.694121 | 0.675599 | Lower Generalization |
+| TCN (Temporal CNN) | External (Generalization) | 918,437 | 0.738991 | 0.685603 | Sequence-based Generalization |
 
 ### Key Generalization Insights
-*   **State-of-the-Art Generalization**: **TCN (Temporal Convolutional Network)** achieved a breakthrough F1-Macro score of **0.845586** on the unseen external dataset (+14% over LightGBM). By analyzing sequential windows of consecutive flows, it successfully detected low-and-slow signatures and generalized across different environments.
-*   **Tree Overfitting**: Tree-based models (CatBoost, LightGBM, XGBoost) perform near-perfectly in-distribution (99.9%), but their decision thresholds struggle with network domain shift, dropping to ~0.70 F1-Macro.
+*   **Tree Generalization Limits**: Both LightGBM and XGBoost generalized consistently well on unseen attacks (around **0.706 Macro F1**), providing a strong balance of high precision (low False Positives, ~4%) with moderate detection rate.
+*   **Sequential Sequence Power**: The TCN (Temporal Convolutional Network) introduces a sliding window sequence mapping that analyzes sequential windows of consecutive flows, allowing it to capture temporal network behavior during domain shifts.
 
 ---
 
