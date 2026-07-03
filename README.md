@@ -1,102 +1,117 @@
 # Binary HTTP Flood Attack Detection Pipeline
 
-This project implements a robust, temporal-aware binary machine learning pipeline designed to detect HTTP-based flooding and Denial of Service (DoS) attacks using network flow features.
+This repository implements a production-grade, temporal-aware binary machine learning pipeline designed to detect HTTP-based flooding and Denial of Service (DoS) attacks at the flow level using network packet header features.
 
 ---
 
-## 1. Project Architecture
+## 1. System Architecture
 
-The model is trained as a **binary classifier** separating legitimate web traffic from malicious application-layer attacks:
-*   **Class 0 (Benign)**: Normal network traffic.
-*   **Class 1 (Attack)**: Composed of volumetric HTTP floods (`DoS attacks-Hulk`, `DDOS attack-HOIC`) and other DoS vectors.
+The pipeline consists of a **Modular Preprocessing & Training Loop** and a **Real-Time Capture Sniffer (Adapter)** running live inference on raw socket streams:
 
-### Key Implementation Details
-*   **Per-Class Temporal Splitting**: To avoid disjoint class distributions across splits (arising from chronological attack recordings), data splitting in [data_utils.py](file:///d:/HTTP%20flood%20attack/src/data_utils.py#L93-L125) is performed temporally *within* each class (70% train, 10% validation, 20% test) before merging, preserving chronological integrity without losing class representation.
-*   **Zero Leakage**: All scaling, imputing, and preprocessing steps are fit exclusively on the training split and applied to the validation, test, and external sets.
-*   **Oversampling-Free Balancing**: The training dataset uses 150,000 unique `Benign` rows and 150,000 unique `Attack` rows (sampled strictly without replacement) to avoid introducing duplicate rows into the learning loop.
-*   **Pre-processed Datasets**: The training and external datasets are provided in compressed format and must be extracted before running the pipeline. No dataset merging or preprocessing is required.
+```mermaid
+graph TD
+    A[Raw PCAP / CSV Datasets] --> B[Step 1: Preprocessing & Splits]
+    B -->|Temporal Chronological Splitting| C[Cached Splits in cache/]
+    C --> D[Step 2: Model Training & Evaluation]
+    D -->|LightGBM, XGBoost, CatBoost| E[Models Selection & Serializing]
+    E -->|Select Best Validation F1| F[models/final_model.joblib]
+    
+    G[Live Socket Interface] -->|Scapy Sniffing| H[realtime_adapter.py]
+    H -->|Aggregate Bidirectional Flows| I[State Feature Map]
+    F -->|Load Pipeline Weights| J[CatBoost Classifier]
+    I -->|78-Dim Pandas DataFrame| J
+    J -->|Real-Time Inference| K{Alert Trigger?}
+    K -->|Yes| L[Console Alert & Live Logging]
+    K -->|No| M[Clean Flow Logged]
+```
+
+### Core Design Principles
+*   **Per-Class Temporal Splitting**: To prevent data leakage and chronological distortion, data splitting is performed sequentially *within* each class (70% train, 10% validation, 20% test) before merging, ensuring chronological consistency.
+*   **No Leakage Guarantee**: All scaling, imputing, and encoding parameters are fit exclusively on the training split and applied to the validation, test, and external sets.
+*   **Oversampling-Free Balancing**: Training data uses a strict 1:1 ratio (150,000 Benign vs 150,000 Attack) selected without replacement to avoid duplicate learning loops.
 
 ---
 
 ## 2. Dataset Overview
-
-The datasets are provided in compressed format in the [datasets/](file:///d:/HTTP%20flood%20attack/datasets/) directory. The `.rar` files are tracked in version control, while the extracted `.csv` files are gitignored and must be extracted locally before running the pipeline:
-
-1.  **Training & Internal Validation**: `training_binary.csv` (300,000 rows, balanced 150,000 Benign vs. 150,000 Attack (composed of 75,000 unique Hulk and 75,000 unique HOIC flows)).
-    - Source: CSE-CIC-IDS2018 (February 15-21, 2018)
-    - Time range: 2018-02-15 01:00:01 to 2018-02-21 10:42:39
-    - Compressed file: `datasets/training_binary.rar`
-
-2.  **External Generalization**: `DDos_pcap_binary_external.csv` (918,437 rows, containing Wednesday and Friday afternoon PCAP flows, with all attacks mapped to the `Attack` class).
-    - Source: CICIDS2017 (Wednesday + Friday afternoon PCAPs)
-    - Contains LOIC DDoS and slow-rate attacks for generalization testing
-    - Compressed files: `datasets/DDos_pcap_binary_external.part1.rar` and `part2.rar`
+1.  **Training & Validation**: `training_binary.csv` (300,000 rows, balanced 50% Benign vs 50% Attack (comprising HOIC, Hulk, Slowloris, SlowHTTPTest, and GoldenEye)).
+    *   *Compressed file*: `datasets/training_binary.rar`
+2.  **External Generalization**: `DDos_pcap_binary_external.csv` (918,437 rows, Thursday + Friday afternoon PCAP flows from CIC-IDS2017). Used purely as out-of-distribution validation.
+    *   *Compressed files*: `datasets/DDos_pcap_binary_external.part1.rar` & `part2.rar`
+3.  **Raw Merged Chronological Set**: `datasetcopy.csv` (2,975,417 rows, containing the raw merged capture days preserving the real-world class skew).
+    *   *Compressed files*: `datasets/datasetcopy.part01.rar` to `part03.rar`
 
 ---
 
 ## 3. How to Run
 
 ### Step 1: Extract the Datasets
-The compressed dataset files are located in the `datasets/` directory. Extract them in-place before running the pipeline:
-
-**Windows:**
+Extract the split volumes directly into the `datasets/` directory:
 ```powershell
-# Extract training dataset
+# Using WinRAR
 & "C:\Program Files\WinRAR\WinRAR.exe" x "datasets/training_binary.rar" "datasets/"
-
-# Extract external dataset (multi-part archive)
 & "C:\Program Files\WinRAR\WinRAR.exe" x "datasets/DDos_pcap_binary_external.part1.rar" "datasets/"
+& "C:\Program Files\WinRAR\WinRAR.exe" x "datasets/datasetcopy.part01.rar" "datasets/"
 ```
-
-**Or use 7-Zip:**
-```powershell
-& "C:\Program Files\7-Zip\7z.exe" x "datasets/training_binary.rar" -odatasets\
-& "C:\Program Files\7-Zip\7z.exe" x "datasets/DDos_pcap_binary_external.part1.rar" -odatasets\
-```
-
-After extraction, you should have:
-- `datasets/training_binary.csv` (300,000 rows)
-- `datasets/DDos_pcap_binary_external.csv` (918,437 rows)
 
 ### Step 2: Run the Modular Training Pipeline
-The pipeline is split into three separate standalone scripts for modular execution. You can run them individually or execute them all sequentially using the orchestrator script:
-
+You can run the orchestrator script to automate Step 1, 2, and 3 sequentially, or execute them step-by-step:
 ```powershell
-# Run the entire pipeline sequentially (Orchestrator)
-& 'C:\Users\ashok\AppData\Local\Programs\Python\Python310\python.exe' src/run_pipeline.py
+# Run the entire pipeline (Orchestrator)
+python src/run_pipeline.py
 
-# Alternatively, execute steps individually:
-# 1. Preprocessing & Data Splitting (saves preprocessed data to cache/)
-& 'C:\Users\ashok\AppData\Local\Programs\Python\Python310\python.exe' src/step1_preprocess.py
-
-# 2. Model Training & Evaluation (loads cached splits and fits models)
-& 'C:\Users\ashok\AppData\Local\Programs\Python\Python310\python.exe' src/step2_train.py
-
-# 3. Markdown Report Generation (generates evaluation reports)
-& 'C:\Users\ashok\AppData\Local\Programs\Python\Python310\python.exe' src/step3_reports.py
+# Step-by-step execution:
+# 1. Preprocessing & Data Splitting
+python src/step1_preprocess.py
+# 2. Model Training & Evaluation
+python src/step2_train.py
+# 3. Report Generation
+python src/step3_reports.py
 ```
 
-Outputs are written to:
-*   [models/](file:///d:/HTTP%20flood%20attack/models/): Saved `.joblib` model binaries and metadata.
-*   [results/](file:///d:/HTTP%20flood%20attack/results/): Predictions and raw metric CSV summaries.
-*   [reports/](file:///d:/HTTP%20flood%20attack/reports/): Markdown reports detailing dataset analyses, splits, and evaluations.
+### Step 3: Run the Ablation Study
+To run the ablation experiments analyzing class balancing, temporal splitting, and feature group removal (running memory-safe systematic sampling on ~495k rows):
+```powershell
+python src/run_ablation_study.py
+```
+Ablation outputs are written to [reports/ablation_study.md](file:///d:/HTTP%20flood%20attack/reports/ablation_study.md).
 
 ---
 
-### Step 3: Run the Ablation Study Experiments
-To analyze the impact of class balancing, temporal splitting, and rate features, execute the ablation script:
-```powershell
-& 'C:\Users\ashok\AppData\Local\Programs\Python\Python310\python.exe' src/run_ablation_study.py
-```
-Ablation outputs:
-*   **Narrative Report**: [reports/ablation_study.md](file:///d:/HTTP%20flood%20attack/reports/ablation_study.md)
-*   **Raw Metrics CSV**: [results/ablation_summary.csv](file:///d:/HTTP%20flood%20attack/results/ablation_summary.csv)
+## 4. Real-Time Detection & Emulation
+
+The real-time detection adapter sniff loopback packets, groups them into flow tuples, calculates features, and runs inference.
+
+### 🛡️ Feature Fingerprints Used by the Model
+By analyzing feature importances, we discovered that tree-based models rely heavily on specific transport-layer options rather than raw packet counts alone:
+1.  **`Fwd Seg Size Min` (TCP Header Length)**: (Importance = **36.4%**). Attacks use custom TCP options yielding a header size of `32` bytes compared to standard `20` byte headers.
+2.  **`Init Fwd Win Byts` (TCP Client Window Size)**: (Importance = **32.5%**). Attacks hardcode their socket window sizes to values like **`26883`** or **`32738`** instead of typical OS defaults.
+3.  **`Dst Port`**: (Importance = **16.9%**). Attacks strictly target port **`80`**.
+
+### Testing the Sniffer on Localhost
+
+1.  **Terminal 1: Start the Sniffer Adapter**
+    *Ensure you install Npcap with the 'WinPcap API-compatible Mode' checked, then run:*
+    ```powershell
+    python src/realtime_adapter.py --interface "Software Loopback Interface 1"
+    ```
+2.  **Terminal 2: Launch the Traffic Emulator**
+    *   **Benign Standard Traffic**:
+        ```powershell
+        python src/emulate_attacks.py --type benign --target 127.0.0.1 --count 20
+        ```
+    *   **Fingerprint-Matched Attack Traffic** (Sends TCP options matching the 2018 GoldenEye/Slowloris signature to trigger alerts):
+        ```powershell
+        python -c "from scapy.all import IP, TCP, send; send(IP(src='127.0.0.1', dst='127.0.0.1')/TCP(sport=54321, dport=80, flags='S', window=26883, options=[('MSS', 1460), ('NOP', None), ('WScale', 8)]), count=500)"
+        ```
+3.  **Verbose Demo Trace**:
+    You can run the un-buffered trace script to see packet capture, aggregation, 78-dim feature extraction, and CatBoost scoring printed step-by-step in your terminal:
+    ```powershell
+    python scratch/demo_realtime_inference.py
+    ```
 
 ---
 
-## 4. Execution & Generalization Results
-
-The comparative results of the trained models are summarized below (detailed in [comparative_evaluation.md](file:///d:/HTTP%20flood%20attack/reports/comparative_evaluation.md)):
+## 5. Summary Evaluation Results
 
 | Model | Split | Samples | Accuracy | Macro F1 | Status |
 | :--- | :--- | ---: | :---: | :---: | :--- |
@@ -105,33 +120,4 @@ The comparative results of the trained models are summarized below (detailed in 
 | **CatBoost** | **External (Generalization)** | 918,437 | 0.694121 | **0.675599** | Moderate Generalization |
 | LightGBM | External (Generalization) | 918,437 | 0.747131 | 0.706019 | Best Generalization |
 | XGBoost | External (Generalization) | 918,437 | 0.746584 | 0.704558 | Similar Generalization |
-
-### Key Generalization Insights
-*   **Best Generalizing Model**: **LightGBM** achieved the best generalization F1-macro score (**0.706019**) on the unseen external dataset, despite CatBoost performing slightly better on in-distribution validation data.
-*   **Overfitting Resistance**: CatBoost provided the highest validation and test accuracy internally (99.99%), showing extremely low variance, though its external domain generalization dropped slightly to **0.675599** Macro F1.
-
----
-
-## 5. Loading and Running a Trained Model (Python Example)
-
-To run inference on new flow feature samples, you can load a trained model directly from the [models/](file:///d:/HTTP%20flood%20attack/models/) directory:
-
-```python
-import joblib
-import pandas as pd
-
-# 1. Load the trained best binary model pipeline (includes the preprocessor steps)
-model = joblib.load("models/final_model.joblib")
-
-# 2. Prepare new flow features as a pandas DataFrame (with correct aligned columns)
-# new_data = pd.DataFrame(...) 
-
-# 3. Predict malicious vs. benign status
-# returns 0 (Benign) or 1 (Attack)
-predictions = model.predict(new_data)
-
-# 4. Predict probabilities
-# returns [probability_Benign, probability_Attack]
-probabilities = model.predict_proba(new_data)
-```
 

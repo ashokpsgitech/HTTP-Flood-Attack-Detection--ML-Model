@@ -54,3 +54,99 @@
 * Confidence:     94.72%
 * Classifier:     Catboost
 ---------------------------------------------
+[2026-07-03 19:12:10] 
+[ALERT] !!! HTTP FLOOD THREAT DETECTED! !!!
+---------------------------------------------
+* Flow Key:       10.18.33.100:52205 -> 10.18.33.250:53 (UDP)
+* Packets Count:  Fwd=2, Bwd=2
+* Confidence:     51.85%
+* Classifier:     Catboost
+---------------------------------------------
+[2026-07-03 19:12:10] 
+[ALERT] !!! HTTP FLOOD THREAT DETECTED! !!!
+---------------------------------------------
+* Flow Key:       10.18.33.100:50060 -> 10.18.33.250:53 (UDP)
+* Packets Count:  Fwd=2, Bwd=2
+* Confidence:     51.85%
+* Classifier:     Catboost
+---------------------------------------------
+[2026-07-03 19:16:22] 
+[ALERT] !!! HTTP FLOOD THREAT DETECTED! !!!
+---------------------------------------------
+* Flow Key:       10.18.33.100:65048 -> 10.18.33.250:53 (UDP)
+* Packets Count:  Fwd=2, Bwd=2
+* Confidence:     51.81%
+* Classifier:     Catboost
+---------------------------------------------
+[2026-07-03 19:17:24] 
+[ALERT] !!! HTTP FLOOD THREAT DETECTED! !!!
+---------------------------------------------
+* Flow Key:       10.18.33.100:65048 -> 10.18.33.250:53 (UDP)
+* Packets Count:  Fwd=3, Bwd=3
+* Confidence:     51.67%
+* Classifier:     Catboost
+---------------------------------------------
+[2026-07-03 19:17:24] 
+[ALERT] !!! HTTP FLOOD THREAT DETECTED! !!!
+---------------------------------------------
+* Flow Key:       10.18.33.100:55404 -> 10.18.33.250:53 (UDP)
+* Packets Count:  Fwd=3, Bwd=3
+* Confidence:     51.67%
+* Classifier:     Catboost
+---------------------------------------------
+[2026-07-03 19:24:37] 
+[ALERT] !!! HTTP FLOOD THREAT DETECTED! !!!
+---------------------------------------------
+* Flow Key:       10.18.33.100:57754 -> 10.18.33.250:53 (UDP)
+* Packets Count:  Fwd=2, Bwd=2
+* Confidence:     51.28%
+* Classifier:     Catboost
+---------------------------------------------
+[2026-07-03 19:24:37] 
+[ALERT] !!! HTTP FLOOD THREAT DETECTED! !!!
+---------------------------------------------
+* Flow Key:       10.18.33.100:60640 -> 10.18.33.250:53 (UDP)
+* Packets Count:  Fwd=2, Bwd=2
+* Confidence:     51.27%
+* Classifier:     Catboost
+---------------------------------------------
+[2026-07-03 19:27:52] 
+[ALERT] !!! HTTP FLOOD THREAT DETECTED! !!!
+---------------------------------------------
+* Flow Key:       10.18.33.100:68 -> 10.18.33.250:67 (UDP)
+* Packets Count:  Fwd=1, Bwd=1
+* Confidence:     78.09%
+* Classifier:     Catboost
+---------------------------------------------
+[2026-07-03 19:31:13] 
+[ALERT] !!! HTTP FLOOD THREAT DETECTED! !!!
+---------------------------------------------
+* Flow Key:       10.18.33.100:60640 -> 10.18.33.250:53 (UDP)
+* Packets Count:  Fwd=2, Bwd=2
+* Confidence:     51.87%
+* Classifier:     Catboost
+---------------------------------------------
+[2026-07-03 19:31:13] 
+[ALERT] !!! HTTP FLOOD THREAT DETECTED! !!!
+---------------------------------------------
+* Flow Key:       10.18.33.100:57754 -> 10.18.33.250:53 (UDP)
+* Packets Count:  Fwd=2, Bwd=2
+* Confidence:     51.86%
+* Classifier:     Catboost
+---------------------------------------------
+[2026-07-03 19:33:30] 
+[ALERT] !!! HTTP FLOOD THREAT DETECTED! !!!
+---------------------------------------------
+* Flow Key:       0.0.0.0:68 -> 255.255.255.255:67 (UDP)
+* Packets Count:  Fwd=1, Bwd=0
+* Confidence:     93.57%
+* Classifier:     Catboost
+---------------------------------------------
+[2026-07-03 19:37:02] 
+[ALERT] !!! HTTP FLOOD THREAT DETECTED! !!!
+---------------------------------------------
+* Flow Key:       127.0.0.1:54321 -> 127.0.0.1:80 (TCP)
+* Packets Count:  Fwd=500, Bwd=500
+* Confidence:     99.65%
+* Classifier:     Catboost
+---------------------------------------------
