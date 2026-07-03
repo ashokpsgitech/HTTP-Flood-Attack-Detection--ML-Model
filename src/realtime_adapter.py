@@ -260,7 +260,7 @@ class LiveDetector:
                     if pred == 1:
                         # Threat Alert
                         alert_msg = (
-                            f"\n[ALERT] 🚨 HTTP FLOOD THREAT DETECTED! 🚨\n"
+                            f"\n[ALERT] !!! HTTP FLOOD THREAT DETECTED! !!!\n"
                             f"---------------------------------------------\n"
                             f"* Flow Key:       {flow.src_ip}:{flow.src_port} -> {flow.dst_ip}:{flow.dst_port} ({'TCP' if flow.proto==6 else 'UDP'})\n"
                             f"* Packets Count:  Fwd={len(flow.fwd_pkts)}, Bwd={len(flow.bwd_pkts)}\n"
