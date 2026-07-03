@@ -32,7 +32,32 @@ graph TD
 
 ---
 
-## 2. Dataset Overview
+## 2. Codebase Modularity (Step-by-Step Breakdown)
+
+The codebase is split into modular execution layers to allow isolated optimization:
+
+### 1. `src/step1_preprocess.py`
+*   **Objective**: Standardizes data splits, aligns features, and prevents leakage.
+*   **Key Functions**:
+    *   `temporal_split()`: Sorts rows chronologically and slices train/val/test splits without shuffling.
+    *   `remove_rows_seen_in_training()`: Purges any exact flows seen in training from evaluation datasets.
+    *   `select_compatible_feature_columns()`: Automatically aligns columns between CSE-CIC-IDS2018 (Train) and CIC-IDS2017 (OOD) sets.
+    *   *Output*: Serializes aligned training matrices to `cache/preprocessed_data.joblib` and writes `reports/run_metadata.json`.
+
+### 2. `src/step2_train.py`
+*   **Objective**: Fits classifiers, serializes model binaries, and scores predictions.
+*   **Key Functions**:
+    *   `build_models()`: Sets up pipeline structures including scaling and imputation.
+    *   `evaluate_model()`: Computes accuracy, weighted/macro precision, recall, F1, ROC AUC, and PR AUC.
+    *   *Output*: Saves trained LGBM, XGBoost, and CatBoost models under `models/` and selects the best performer (`models/final_model.joblib`) based on validation Macro F1.
+
+### 3. `src/step3_reports.py`
+*   **Objective**: Compiles pipeline statistics into markdown reports.
+*   *Output*: Generates 6 curriculum evaluation reports under `reports/`.
+
+---
+
+## 3. Dataset Overview
 1.  **Training & Validation**: `training_binary.csv` (300,000 rows, balanced 50% Benign vs 50% Attack (comprising HOIC, Hulk, Slowloris, SlowHTTPTest, and GoldenEye)).
     *   *Compressed file*: `datasets/training_binary.rar`
 2.  **External Generalization**: `DDos_pcap_binary_external.csv` (918,437 rows, Thursday + Friday afternoon PCAP flows from CIC-IDS2017). Used purely as out-of-distribution validation.
@@ -42,7 +67,7 @@ graph TD
 
 ---
 
-## 3. How to Run
+## 4. How to Run
 
 ### Step 1: Extract the Datasets
 Extract the split volumes directly into the `datasets/` directory:
@@ -77,9 +102,24 @@ Ablation outputs are written to [reports/ablation_study.md](file:///d:/HTTP%20fl
 
 ---
 
-## 4. Real-Time Detection & Emulation
+## 5. Ablation Study Findings (Systematic Analysis)
 
-The real-time detection adapter sniff loopback packets, groups them into flow tuples, calculates features, and runs inference.
+The ablation study executes three experiments to demonstrate the necessity of balancing, temporal sorting, and rate features:
+
+### Ablation Metrics Comparison
+
+| Experiment Setup | LightGBM F1-Macro | XGBoost F1-Macro | CatBoost F1-Macro | Core Lesson |
+| :--- | :---: | :---: | :---: | :--- |
+| **Baseline (Temporal + Balanced)** | **0.706019** | **0.704558** | **0.675599** | Reference performance threshold. |
+| **Exp 1: No Class Balancing** | 0.398107 | 0.386246 | 0.421820 | Dropping balancing drops generalization by **-30%** as trees overfit benign majority. |
+| **Exp 2: Random Splitting** | 0.999983 | 1.000000 | 1.000000 | Random split causes **leakage**, artificially inflating F1 to 1.00. |
+| **Exp 3: Dropping Rate Features** | 0.372553 | 0.373492 | 0.390447 | Dropping rate group drops generalization by **-33%**, showing rates are critical. |
+
+---
+
+## 6. Real-Time Detection & Emulation
+
+The real-time detection adapter sniffs loopback packets, groups them into flow tuples, calculates features, and runs inference.
 
 ### 🛡️ Feature Fingerprints Used by the Model
 By analyzing feature importances, we discovered that tree-based models rely heavily on specific transport-layer options rather than raw packet counts alone:
@@ -111,7 +151,20 @@ By analyzing feature importances, we discovered that tree-based models rely heav
 
 ---
 
-## 5. Summary Evaluation Results
+## 7. Windows Capture (Npcap) Troubleshooting
+
+If Scapy throws capture errors or fails to list adapters:
+1.  **No libpcap provider available warning**:
+    *   Download and install Npcap from [https://npcap.com/](https://npcap.com/).
+    *   Ensure you check **"Install Npcap in WinPcap API-compatible Mode"** during installation.
+    *   Restart your PowerShell terminal.
+2.  **Interface Not Found Error**:
+    *   Run `python -c "from scapy.all import show_interfaces; show_interfaces()"` to print the list of device GUIDs and names.
+    *   Use the exact name or GUID index mapping for loopback captures (e.g. `"Software Loopback Interface 1"`).
+
+---
+
+## 8. Summary Evaluation Results
 
 | Model | Split | Samples | Accuracy | Macro F1 | Status |
 | :--- | :--- | ---: | :---: | :---: | :--- |
