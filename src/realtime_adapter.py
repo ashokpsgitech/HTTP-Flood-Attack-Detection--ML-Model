@@ -189,9 +189,9 @@ class RealtimeFlow:
             "Idle Mean": 0.0, "Idle Std": 0.0, "Idle Max": 0.0, "Idle Min": 0.0
         }
 
-        # Return values aligned exactly to metadata features order
+        # Return values aligned exactly to metadata features order as a Pandas DataFrame
         ordered_vals = [feat_dict.get(feat, 0.0) for feat in all_feature_names]
-        return np.array(ordered_vals).reshape(1, -1)
+        return pd.DataFrame([ordered_vals], columns=all_feature_names)
 
 
 class LiveDetector:
