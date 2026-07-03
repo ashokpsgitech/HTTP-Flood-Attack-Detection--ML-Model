@@ -1,0 +1,56 @@
+[2026-07-03 16:33:57] 
+[ALERT] !!! HTTP FLOOD THREAT DETECTED! !!!
+---------------------------------------------
+* Flow Key:       0.0.0.0:68 -> 255.255.255.255:67 (UDP)
+* Packets Count:  Fwd=2, Bwd=0
+* Confidence:     93.71%
+* Classifier:     Catboost
+---------------------------------------------
+[2026-07-03 16:34:52] 
+[ALERT] !!! HTTP FLOOD THREAT DETECTED! !!!
+---------------------------------------------
+* Flow Key:       0.0.0.0:68 -> 255.255.255.255:67 (UDP)
+* Packets Count:  Fwd=2, Bwd=0
+* Confidence:     97.56%
+* Classifier:     Catboost
+---------------------------------------------
+[2026-07-03 16:38:31] 
+[ALERT] !!! HTTP FLOOD THREAT DETECTED! !!!
+---------------------------------------------
+* Flow Key:       0.0.0.0:68 -> 255.255.255.255:67 (UDP)
+* Packets Count:  Fwd=2, Bwd=0
+* Confidence:     94.72%
+* Classifier:     Catboost
+---------------------------------------------
+[2026-07-03 16:40:56] 
+[ALERT] !!! HTTP FLOOD THREAT DETECTED! !!!
+---------------------------------------------
+* Flow Key:       0.0.0.0:68 -> 255.255.255.255:67 (UDP)
+* Packets Count:  Fwd=2, Bwd=0
+* Confidence:     95.68%
+* Classifier:     Catboost
+---------------------------------------------
+[2026-07-03 16:43:08] 
+[ALERT] !!! HTTP FLOOD THREAT DETECTED! !!!
+---------------------------------------------
+* Flow Key:       0.0.0.0:68 -> 255.255.255.255:67 (UDP)
+* Packets Count:  Fwd=2, Bwd=0
+* Confidence:     97.56%
+* Classifier:     Catboost
+---------------------------------------------
+[2026-07-03 16:43:29] 
+[ALERT] !!! HTTP FLOOD THREAT DETECTED! !!!
+---------------------------------------------
+* Flow Key:       0.0.0.0:68 -> 255.255.255.255:67 (UDP)
+* Packets Count:  Fwd=2, Bwd=0
+* Confidence:     94.18%
+* Classifier:     Catboost
+---------------------------------------------
+[2026-07-03 16:43:53] 
+[ALERT] !!! HTTP FLOOD THREAT DETECTED! !!!
+---------------------------------------------
+* Flow Key:       0.0.0.0:68 -> 255.255.255.255:67 (UDP)
+* Packets Count:  Fwd=2, Bwd=0
+* Confidence:     94.72%
+* Classifier:     Catboost
+---------------------------------------------
