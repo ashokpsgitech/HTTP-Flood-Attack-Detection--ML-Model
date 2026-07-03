@@ -58,16 +58,39 @@ After extraction, you should have:
 - `datasets/training_binary.csv` (300,000 rows)
 - `datasets/DDos_pcap_binary_external.csv` (918,437 rows)
 
-### Step 2: Train and Evaluate the Models
-Run the training pipeline to train the baseline and advanced classifiers, save model artifacts, and generate comparative reports:
+### Step 2: Run the Modular Training Pipeline
+The pipeline is split into three separate standalone scripts for modular execution. You can run them individually or execute them all sequentially using the orchestrator script:
+
 ```powershell
+# Run the entire pipeline sequentially (Orchestrator)
 & 'C:\Users\ashok\AppData\Local\Programs\Python\Python310\python.exe' src/run_pipeline.py
+
+# Alternatively, execute steps individually:
+# 1. Preprocessing & Data Splitting (saves preprocessed data to cache/)
+& 'C:\Users\ashok\AppData\Local\Programs\Python\Python310\python.exe' src/step1_preprocess.py
+
+# 2. Model Training & Evaluation (loads cached splits and fits models)
+& 'C:\Users\ashok\AppData\Local\Programs\Python\Python310\python.exe' src/step2_train.py
+
+# 3. Markdown Report Generation (generates evaluation reports)
+& 'C:\Users\ashok\AppData\Local\Programs\Python\Python310\python.exe' src/step3_reports.py
 ```
 
 Outputs are written to:
 *   [models/](file:///d:/HTTP%20flood%20attack/models/): Saved `.joblib` model binaries and metadata.
-*   [results/](file:///d:/HTTP%20flood%20attack/results/): Predictions and raw metric csv summaries.
+*   [results/](file:///d:/HTTP%20flood%20attack/results/): Predictions and raw metric CSV summaries.
 *   [reports/](file:///d:/HTTP%20flood%20attack/reports/): Markdown reports detailing dataset analyses, splits, and evaluations.
+
+---
+
+### Step 3: Run the Ablation Study Experiments
+To analyze the impact of class balancing, temporal splitting, and rate features, execute the ablation script:
+```powershell
+& 'C:\Users\ashok\AppData\Local\Programs\Python\Python310\python.exe' src/run_ablation_study.py
+```
+Ablation outputs:
+*   **Narrative Report**: [reports/ablation_study.md](file:///d:/HTTP%20flood%20attack/reports/ablation_study.md)
+*   **Raw Metrics CSV**: [results/ablation_summary.csv](file:///d:/HTTP%20flood%20attack/results/ablation_summary.csv)
 
 ---
 
