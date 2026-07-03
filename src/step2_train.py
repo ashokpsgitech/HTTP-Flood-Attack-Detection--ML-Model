@@ -1,9 +1,17 @@
+# ==============================================================================
+# PIPELINE STEP 2: MODEL TRAINING & EVALUATION
+# ==============================================================================
+# This script loads the preprocessed data matrices, builds and trains LightGBM,
+# XGBoost, and CatBoost models, and calculates classification reports.
+# ==============================================================================
+
 import sys
 import time
 import joblib
 import pandas as pd
 from pathlib import Path
 
+# Ensure proper module resolution
 sys.path.append(str(Path(__file__).parent))
 
 from config import (
@@ -21,6 +29,10 @@ def main():
     print("PIPELINE STEP 2: MODEL TRAINING & EVALUATION")
     print("="*60)
 
+    # --------------------------------------------------------------------------
+    # SUBSTEP 2.1: Cache Loader
+    # --------------------------------------------------------------------------
+    # Load cached training, validation, and testing matrices produced in Step 1.
     cache_path = PROJECT_ROOT / "cache" / "preprocessed_data.joblib"
     if not cache_path.exists():
         raise FileNotFoundError(f"Cached preprocessing data not found at {cache_path}. Run step1_preprocess.py first.")
@@ -37,15 +49,22 @@ def main():
     feature_columns = cache["feature_columns"]
     dropped_training_only_features = cache["dropped_training_only_features"]
 
-    # 1. Build models
+    # --------------------------------------------------------------------------
+    # SUBSTEP 2.2: Pipeline Instantiation
+    # --------------------------------------------------------------------------
+    # Build standard scikit-learn training pipelines for all models.
     models = build_models(feature_columns)
 
-    # 2. Train and evaluate
     validation_scores = {}
     all_metrics = []
     reports_dfs = []
     per_class_dfs = []
 
+    # --------------------------------------------------------------------------
+    # SUBSTEP 2.3: Training Loop & Evaluation
+    # --------------------------------------------------------------------------
+    # Loop over each classifier, train it on x_train/y_train, and record performance
+    # profiles across Validation, Internal Test, and OOD External splits.
     for model_name, model in models.items():
         print("\n" + "-"*60)
         print(f"Training {model_name}...")
@@ -56,12 +75,12 @@ def main():
         training_time = time.perf_counter() - start_time
         print(f"[OK] Training completed in {training_time:.2f} seconds")
 
-        # Save model
+        # Save individual model binary
         model_path = MODELS_DIR / f"{model_name}.joblib"
         joblib.dump(model, model_path)
         print(f"[OK] Model saved to: {model_path}")
 
-        # Evaluate on splits
+        # Evaluate models on splits
         for split_name, x_split, y_split in [
             ("validation", x_validation, y_validation),
             ("internal_test", x_test, y_test),
@@ -77,23 +96,26 @@ def main():
             per_class_dfs.append(per_class_df)
             print(f"  [OK] {split_name} evaluation completed")
 
-            # Output validation score for selection
+            # Extract validation F1-score for ultimate model selection
             if split_name == "validation":
                 validation_scores[model_name] = metrics["f1_macro"]
 
+            # Print summaries to stdout
             print("\n" + "="*50)
             print(f"MODEL: {model_name} | SPLIT: {split_name}")
             print("="*50)
             for k, v in metrics.items():
                 if k not in ["model", "split", "experiment"]:
                     val_format = f"{v:.6f}" if isinstance(v, float) else str(v)
-                    # Convert key to human readable
                     key_str = k.replace("_", " ").title().replace("Roc", "ROC").replace("Pr", "PR").replace("Fps", "FPS").replace("Fpr", "FPR").replace("Fnr", "FNR")
                     unit = " ms/sample" if "Latency" in key_str else " seconds" if "Time" in key_str else ""
                     print(f"* {key_str}:{val_format.rjust(30 - len(key_str))}{unit}")
             print("="*50)
 
-    # 3. Save evaluation results
+    # --------------------------------------------------------------------------
+    # SUBSTEP 2.4: Save Summary Deliverables
+    # --------------------------------------------------------------------------
+    # Write comparative metrics dataframes to results/ for project reporting.
     metrics_df = pd.DataFrame(all_metrics)
     metrics_df.to_csv(RESULTS_DIR / "metrics_summary.csv", index=False)
     print(f"\n[OK] Metrics summary saved to: {RESULTS_DIR / 'metrics_summary.csv'}")
@@ -106,7 +128,11 @@ def main():
     per_class_df.to_csv(RESULTS_DIR / "per_class_tp_tn_fp_fn.csv", index=False)
     print(f"[OK] Per-class metrics saved to: {RESULTS_DIR / 'per_class_tp_tn_fp_fn.csv'}")
 
-    # 4. Save best model
+    # --------------------------------------------------------------------------
+    # SUBSTEP 2.5: Select Best-Performing Model
+    # --------------------------------------------------------------------------
+    # Automatically select the model with the highest validation Macro F1 score
+    # and save it to models/final_model.joblib for production adapter usage.
     print("\n" + "="*60)
     print("Selecting and saving best model based on validation macro F1")
     print("="*60)
@@ -132,7 +158,10 @@ def main():
     )
     print(f"[OK] Model metadata saved to: {MODELS_DIR / 'final_model_metadata.json'}")
 
-    # 5. Predictions
+    # --------------------------------------------------------------------------
+    # SUBSTEP 2.6: Final Predictions Output
+    # --------------------------------------------------------------------------
+    # Save the target split predictions csv files for grading/verification.
     if WRITE_FINAL_PREDICTIONS:
         print("\n" + "="*60)
         print("Generating final predictions")

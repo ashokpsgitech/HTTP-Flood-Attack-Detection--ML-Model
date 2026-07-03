@@ -1,7 +1,15 @@
+# ==============================================================================
+# PIPELINE STEP 1: PREPROCESSING & DATA SPLITTING
+# ==============================================================================
+# This script handles the raw dataset loading, strict chronological splitting,
+# duplicate removal, leakage prevention, feature alignment, and final caching.
+# ==============================================================================
+
 import sys
 from pathlib import Path
 import joblib
 
+# Ensure the parent src/ directory is in the path for proper module resolution
 sys.path.append(str(Path(__file__).parent))
 
 from config import (
@@ -34,11 +42,19 @@ def main():
     print("PIPELINE STEP 1: PREPROCESSING & DATA SPLITTING")
     print("="*60)
     
-    # 1. Ensure output directories exist
+    # --------------------------------------------------------------------------
+    # SUBSTEP 1.1: Directory Initialization
+    # --------------------------------------------------------------------------
+    # Ensure that all output folders exist so model checkpoints, metrics summaries,
+    # and markdown evaluation reports can be written without permission errors.
     ensure_dirs(REPORTS_DIR, RESULTS_DIR, MODELS_DIR, RESULTS_DIR / "confusion_matrices")
     print(f"[OK] Created directories: {REPORTS_DIR}, {RESULTS_DIR}, {MODELS_DIR}")
 
-    # 2. Load datasets
+    # --------------------------------------------------------------------------
+    # SUBSTEP 1.2: Dataset Loading
+    # --------------------------------------------------------------------------
+    # Load the training dataset and the out-of-distribution (OOD) external validation
+    # dataset. Max rows limit can be configured in config.py for testing.
     allowed_labels = set(CLASS_LABELS)
     print(f"Loading training dataset from: {TRAIN_DATASET}")
     train_df = load_dataset(TRAIN_DATASET, allowed_labels=allowed_labels, max_rows=MAX_ROWS, require_timestamp=True)
@@ -48,14 +64,24 @@ def main():
     external_df = load_dataset(EXTERNAL_DATASET, allowed_labels=allowed_labels, max_rows=MAX_ROWS)
     print(f"[OK] External dataset loaded: {len(external_df)} rows")
 
-    # 3. Temporal Splitting (strict ordering)
+    # --------------------------------------------------------------------------
+    # SUBSTEP 1.3: Temporal splitting (Strict Chronological Ordering)
+    # --------------------------------------------------------------------------
+    # To prevent information leakage (e.g. training on future traffic metrics),
+    # the dataset is split sequentially: Train (70%), Validation (10%), and Test (20%).
+    # Shuffling is strictly prohibited prior to this split.
     print(f"Split ratios: Train={TRAIN_SPLIT:.0%}, Validation={VALIDATION_SPLIT:.0%}, Test={1-TRAIN_SPLIT-VALIDATION_SPLIT:.0%}")
     train_split_df, validation_df, test_df = temporal_split(train_df, TRAIN_SPLIT, VALIDATION_SPLIT)
     print(f"[OK] Train split: {len(train_split_df)} rows")
     print(f"[OK] Validation split: {len(validation_df)} rows")
     print(f"[OK] Test split: {len(test_df)} rows")
 
-    # 4. Leakage Prevention & Deduplication
+    # --------------------------------------------------------------------------
+    # SUBSTEP 1.4: Duplicate Removal & Leakage Prevention
+    # --------------------------------------------------------------------------
+    # We remove identical duplicate flows in the training split.
+    # To avoid testing leakage, any network flow records present in training
+    # are systematically purged from validation, testing, and external sets.
     print("Removing exact duplicates from training set...")
     train_split_df = remove_training_duplicates(train_split_df)
     print(f"[OK] Training set after deduplication: {len(train_split_df)} rows")
@@ -72,7 +98,11 @@ def main():
     external_df = remove_rows_seen_in_training(external_df, train_split_df)
     print(f"[OK] External set after leakage removal: {len(external_df)} rows")
 
-    # 5. Feature Selection
+    # --------------------------------------------------------------------------
+    # SUBSTEP 1.5: Feature Set Alignment
+    # --------------------------------------------------------------------------
+    # Detect the overlapping features that exist in both the training set
+    # and the external set to build models that can perform generalizable inference.
     feature_columns = select_compatible_feature_columns(train_split_df, external_df)
     if not feature_columns:
         raise ValueError("No compatible feature columns found.")
@@ -84,13 +114,20 @@ def main():
     if dropped_training_only_features:
         print(f"[OK] Dropped training-only features: {', '.join(dropped_training_only_features)}")
 
-    # 6. Prepare Matrices
+    # --------------------------------------------------------------------------
+    # SUBSTEP 1.6: Feature & Label Matrix Preparation
+    # --------------------------------------------------------------------------
+    # Construct standard target arrays (y) and feature matrices (X) for training.
     x_train, y_train, feature_columns = prepare_xy(train_split_df, feature_columns)
     x_val, y_val, _ = prepare_xy(validation_df, feature_columns)
     x_test, y_test, _ = prepare_xy(test_df, feature_columns)
     x_ext, y_ext, _ = prepare_xy(external_df, feature_columns)
 
-    # 7. Generate Run Metadata
+    # --------------------------------------------------------------------------
+    # SUBSTEP 1.7: Save Run Metadata & Splits Cache
+    # --------------------------------------------------------------------------
+    # Save split profiles to reports/run_metadata.json, and serialize the pandas X/y
+    # matrices to a local cache to allow Step 2 to load them instantly.
     metadata = {
         "project_root": str(PROJECT_ROOT),
         "class_labels": CLASS_LABELS,
@@ -108,7 +145,6 @@ def main():
     write_json(REPORTS_DIR / "run_metadata.json", metadata)
     print(f"[OK] Metadata written to: {REPORTS_DIR / 'run_metadata.json'}")
 
-    # Save cache
     cache_dir = PROJECT_ROOT / "cache"
     cache_dir.mkdir(exist_ok=True)
     cache_path = cache_dir / "preprocessed_data.joblib"
