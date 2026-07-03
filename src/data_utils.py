@@ -304,3 +304,8 @@ def evaluate_predictions(model_name, split_name, y_true, y_pred, y_proba, elapse
 
 def write_json(path: Path, payload: dict) -> None:
     path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
+def read_json(path: Path) -> dict:
+    return json.loads(path.read_text(encoding="utf-8"))
+

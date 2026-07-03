@@ -21,4 +21,5 @@ Thumbs.db
 
 # CatBoost training files
 catboost_info/
+cache/
 
