@@ -189,7 +189,10 @@ def run_experiment_3():
         "Flow IAT Mean", "Fwd IAT Mean", "Bwd IAT Mean"
     ]
     feature_columns = [col for col in feature_columns if col not in rate_features]
-    print(f"  Dropped {len(rate_features)} rate features. Compatible features remaining: {len(feature_columns)}")
+    print(f"  [DEBUG] Dropped {len(rate_features)} feature columns for Experiment 3:")
+    for feat in rate_features:
+        print(f"     - {feat}")
+    print(f"  Compatible features remaining: {len(feature_columns)}")
     
     x_train, y_train, feature_columns = prepare_xy(train_split_df, feature_columns)
     x_ext, y_ext, _ = prepare_xy(external_df, feature_columns)
