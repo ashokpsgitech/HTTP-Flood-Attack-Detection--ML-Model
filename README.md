@@ -69,6 +69,22 @@ The codebase is split into modular execution layers to allow isolated optimizati
 
 ## 4. How to Run
 
+### Step 0: Set Up the Python Environment
+Create and activate a virtual environment, then install all required dependencies:
+```powershell
+# Create the virtual environment
+python -m venv .venv
+
+# Activate it
+.venv\Scripts\Activate.ps1
+
+# Install all dependencies
+pip install -r requirements.txt
+```
+
+> **Note**: Python 3.10+ is required. On Windows, if script execution is blocked, run:
+> `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser`
+
 ### Step 1: Extract the Datasets
 Extract the split volumes directly into the `datasets/` directory:
 ```powershell
