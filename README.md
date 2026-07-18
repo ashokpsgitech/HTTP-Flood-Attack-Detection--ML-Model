@@ -13,12 +13,12 @@ graph TD
     A[Raw PCAP / CSV Datasets] --> B[Step 1: Preprocessing & Splits]
     B -->|Temporal Chronological Splitting| C[Cached Splits in cache/]
     C --> D[Step 2: Model Training & Evaluation]
-    D -->|LightGBM, XGBoost, CatBoost| E[Models Selection & Serializing]
+    D -->|LightGBM, XGBoost, CatBoost, Decision Tree, Logistic Regression| E[Models Selection & Serializing]
     E -->|Select Best Validation F1| F[models/final_model.joblib]
     
     G[Live Socket Interface] -->|Scapy Sniffing| H[realtime_adapter.py]
     H -->|Aggregate Bidirectional Flows| I[State Feature Map]
-    F -->|Load Pipeline Weights| J[CatBoost Classifier]
+    F -->|Load Pipeline Weights| J[XGBoost Classifier]
     I -->|78-Dim Pandas DataFrame| J
     J -->|Real-Time Inference| K{Alert Trigger?}
     K -->|Yes| L[Console Alert & Live Logging]
@@ -49,7 +49,7 @@ The codebase is split into modular execution layers to allow isolated optimizati
 *   **Key Functions**:
     *   `build_models()`: Sets up pipeline structures including scaling and imputation.
     *   `evaluate_model()`: Computes accuracy, weighted/macro precision, recall, F1, ROC AUC, and PR AUC.
-    *   *Output*: Saves trained LGBM, XGBoost, and CatBoost models under `models/` and selects the best performer (`models/final_model.joblib`) based on validation Macro F1.
+    *   *Output*: Saves trained LightGBM, XGBoost, CatBoost, Decision Tree, and Logistic Regression models under `models/` and selects the best performer (`models/final_model.joblib`) based on validation Macro F1.
 
 ### 3. `src/step3_reports.py`
 *   **Objective**: Compiles pipeline statistics into markdown reports.
@@ -122,14 +122,14 @@ Ablation outputs are written to [reports/ablation_study.md](file:///d:/HTTP%20fl
 
 The ablation study executes three experiments to demonstrate the necessity of balancing, temporal sorting, and rate features:
 
-### Ablation Metrics Comparison
+### Ablation Metrics Comparison (F1-Macro)
 
-| Experiment Setup | LightGBM F1-Macro | XGBoost F1-Macro | CatBoost F1-Macro | Core Lesson |
-| :--- | :---: | :---: | :---: | :--- |
-| **Baseline (Temporal + Balanced)** | **0.706019** | **0.704558** | **0.675599** | Reference performance threshold. |
-| **Exp 1: No Class Balancing** | 0.398107 | 0.386246 | 0.421820 | Dropping balancing drops generalization by **-30%** as trees overfit benign majority. |
-| **Exp 2: Random Splitting** | 0.999983 | 1.000000 | 1.000000 | Random split causes **leakage**, artificially inflating F1 to 1.00. |
-| **Exp 3: Dropping Rate Features** | 0.372553 | 0.373492 | 0.390447 | Dropping rate group drops generalization by **-33%**, showing rates are critical. |
+| Experiment Setup | LightGBM | XGBoost | CatBoost | Decision Tree | Logistic Regression | Core Lesson |
+| :--- | :---: | :---: | :---: | :---: | :---: | :--- |
+| **Baseline (Temporal + Balanced)** | **0.706019** | **0.705736** | **0.675599** | **0.767083** | **0.346033** | Reference performance threshold. |
+| **Exp 1: No Class Balancing** | 0.398107 | 0.385628 | 0.421820 | 0.395383 | 0.416457 | Dropping balancing drops generalization by **-30%** (trees overfit benign majority). |
+| **Exp 2: Random Splitting** | 0.999983 | 1.000000 | 1.000000 | 0.998468 | 0.998939 | Random split causes **leakage**, artificially inflating F1 to ~1.00. |
+| **Exp 3: Dropping Rate Features** | 0.372553 | 0.373478 | 0.390447 | 0.373078 | 0.488402 | Dropping rate group drops generalization by **-33%**, showing rates are critical. |
 
 ---
 
@@ -184,9 +184,19 @@ If Scapy throws capture errors or fails to list adapters:
 
 | Model | Split | Samples | Accuracy | Macro F1 | Status |
 | :--- | :--- | ---: | :---: | :---: | :--- |
-| **CatBoost** | **Validation** | 29,998 | 0.999833 | **0.999833** | **Selected Best Model** |
+| **XGBoost** | **Validation** | 29,998 | 0.999867 | **0.999867** | **Selected Best Model** |
+| **CatBoost** | Validation | 29,998 | 0.999833 | **0.999833** | Passed |
+| **LightGBM** | Validation | 29,998 | 0.999800 | **0.999800** | Passed |
+| **Logistic Regression** | Validation | 29,998 | 0.999800 | **0.999800** | Passed |
+| **Decision Tree** | Validation | 29,998 | 0.994566 | **0.994566** | Passed |
 | **CatBoost** | **Internal Test** | 60,002 | 0.999967 | **0.999967** | Passed |
-| **CatBoost** | **External (Generalization)** | 918,437 | 0.694121 | **0.675599** | Moderate Generalization |
-| LightGBM | External (Generalization) | 918,437 | 0.747131 | 0.706019 | Best Generalization |
-| XGBoost | External (Generalization) | 918,437 | 0.746584 | 0.704558 | Similar Generalization |
+| **LightGBM** | Internal Test | 60,002 | 0.999950 | **0.999950** | Passed |
+| **Logistic Regression** | Internal Test | 60,002 | 0.999833 | **0.999833** | Passed |
+| **XGBoost** | Internal Test | 60,002 | 0.999817 | **0.999817** | Passed |
+| **Decision Tree** | Internal Test | 60,002 | 0.502700 | **0.339654** | Regularization Drop |
+| **Decision Tree** | **External (OOD)** | 918,437 | 0.791661 | **0.767083** | **Best Generalization** |
+| **LightGBM** | External (OOD) | 918,437 | 0.747131 | **0.706019** | Strong Generalization |
+| **XGBoost** | External (OOD) | 918,437 | 0.751625 | **0.705736** | Strong Generalization |
+| **CatBoost** | External (OOD) | 918,437 | 0.694121 | **0.675599** | Moderate Generalization |
+| **Logistic Regression** | External (OOD) | 918,437 | 0.450342 | **0.346033** | Poor Generalization |
 
