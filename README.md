@@ -82,8 +82,24 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-> **Note**: Python 3.10+ is required. On Windows, if script execution is blocked, run:
-> `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser`
+> **Troubleshooting PowerShell Script Block**: 
+> If you get an error stating that *running scripts is disabled on this system* (`PSSecurityException`), choose one of the following alternatives:
+> 
+> * **Alternative A: Run directly without activation (Recommended)**
+>   No activation is needed. Call the binaries directly:
+>   ```powershell
+   # Install dependencies
+   .venv\Scripts\python.exe -m pip install -r requirements.txt
+
+   # Run python commands
+   .venv\Scripts\python.exe src\run_pipeline.py
+   ```
+> 
+> * **Alternative B: Temporarily bypass the policy in the current terminal**
+>   ```powershell
+   Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process
+   .venv\Scripts\Activate.ps1
+   ```
 
 ### Step 1: Extract the Datasets
 Extract the split volumes directly into the `datasets/` directory:
