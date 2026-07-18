@@ -271,7 +271,7 @@ def main():
         "| :--- | :---: | :---: | :---: |"
     ]
     
-    for name in ["lightgbm", "xgboost", "catboost"]:
+    for name in ["lightgbm", "xgboost", "catboost", "decision_tree", "logistic_regression"]:
         baseline_f1 = get_baseline(name, "external", "f1_macro")
         ablated_f1 = ablation_df[(ablation_df["model"] == name) & (ablation_df["experiment"] == "No Balancing")]["f1_macro"].values[0]
         diff = ablated_f1 - baseline_f1
@@ -300,7 +300,7 @@ def main():
         "| :--- | :---: | :---: | :---: |"
     ])
     
-    for name in ["lightgbm", "xgboost", "catboost"]:
+    for name in ["lightgbm", "xgboost", "catboost", "decision_tree", "logistic_regression"]:
         baseline_f1 = get_baseline(name, "internal_test", "f1_macro")
         ablated_f1 = ablation_df[(ablation_df["model"] == name) & (ablation_df["experiment"] == "Random Shuffled Split")]["f1_macro"].values[0]
         diff = ablated_f1 - baseline_f1
@@ -329,7 +329,7 @@ def main():
         "| :--- | :---: | :---: | :---: |"
     ])
     
-    for name in ["lightgbm", "xgboost", "catboost"]:
+    for name in ["lightgbm", "xgboost", "catboost", "decision_tree", "logistic_regression"]:
         baseline_f1 = get_baseline(name, "external", "f1_macro")
         ablated_f1 = ablation_df[(ablation_df["model"] == name) & (ablation_df["experiment"] == "No Rate Features")]["f1_macro"].values[0]
         diff = ablated_f1 - baseline_f1

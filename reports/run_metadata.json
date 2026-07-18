@@ -1,5 +1,5 @@
 {
-  "project_root": "D:\\HTTP flood attack",
+  "project_root": "D:\\Project\\HTTP-Flood-Attack-Detection--ML-Model",
   "class_labels": {
     "Benign": 0,
     "Attack": 1
@@ -87,7 +87,7 @@
     "Protocol"
   ],
   "train_dataset": {
-    "path": "D:\\HTTP flood attack\\datasets\\training_binary.csv",
+    "path": "D:\\Project\\HTTP-Flood-Attack-Detection--ML-Model\\datasets\\training_binary.csv",
     "sha256": "2be43ce8befa2840b33a16ccf2716842f36b545c3304a467757f77444756948c",
     "rows_after_filtering": 300000,
     "columns": 80,
@@ -100,7 +100,7 @@
     "exact_duplicate_rows_after_filtering": 1
   },
   "external_dataset": {
-    "path": "D:\\HTTP flood attack\\datasets\\DDos_pcap_binary_external.csv",
+    "path": "D:\\Project\\HTTP-Flood-Attack-Detection--ML-Model\\datasets\\DDos_pcap_binary_external.csv",
     "sha256": "6f4eed76e05971dc4b8145950ad0fc14ed0d85fd441d7a8838354f4a48d00a1a",
     "rows_after_filtering": 918437,
     "columns": 79,

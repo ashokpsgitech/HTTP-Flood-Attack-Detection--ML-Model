@@ -9,7 +9,7 @@
 
 ## Training Dataset
 
-- Path: `D:\HTTP flood attack\datasets\training_binary.csv`
+- Path: `D:\Project\HTTP-Flood-Attack-Detection--ML-Model\datasets\training_binary.csv`
 - SHA256: `2be43ce8befa2840b33a16ccf2716842f36b545c3304a467757f77444756948c`
 - Rows after filtering: 300000
 - Time range: 2018-02-15 01:00:01 to 2018-02-21 10:42:39
@@ -17,7 +17,7 @@
 
 ## External Dataset
 
-- Path: `D:\HTTP flood attack\datasets\DDos_pcap_binary_external.csv`
+- Path: `D:\Project\HTTP-Flood-Attack-Detection--ML-Model\datasets\DDos_pcap_binary_external.csv`
 - SHA256: `6f4eed76e05971dc4b8145950ad0fc14ed0d85fd441d7a8838354f4a48d00a1a`
 - Rows after filtering: 918437
 - Time range: None to None

@@ -9,6 +9,7 @@ from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.feature_selection import VarianceThreshold
 from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression
+from sklearn.tree import DecisionTreeClassifier
 from sklearn.metrics import confusion_matrix
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
@@ -129,6 +130,33 @@ def build_models(feature_columns):
                         random_seed=42,
                         verbose=0,
                         thread_count=-1
+                    ),
+                ),
+            ]
+        ),
+        "decision_tree": Pipeline(
+            steps=[
+                ("preprocess", tree_preprocessor),
+                (
+                    "model",
+                    DecisionTreeClassifier(
+                        max_depth=12,
+                        class_weight="balanced",
+                        random_state=42,
+                    ),
+                ),
+            ]
+        ),
+        "logistic_regression": Pipeline(
+            steps=[
+                ("preprocess", scaled_preprocessor),
+                (
+                    "model",
+                    LogisticRegression(
+                        max_iter=1000,
+                        class_weight="balanced",
+                        random_state=42,
+                        n_jobs=-1,
                     ),
                 ),
             ]

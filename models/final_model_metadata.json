@@ -1,7 +1,7 @@
 {
-  "best_model": "catboost",
+  "best_model": "xgboost",
   "selection_metric": "validation_f1_macro",
-  "validation_f1_macro": 0.9998333222168508,
+  "validation_f1_macro": 0.9998666577748143,
   "feature_columns": [
     "Dst Port",
     "Flow Duration",

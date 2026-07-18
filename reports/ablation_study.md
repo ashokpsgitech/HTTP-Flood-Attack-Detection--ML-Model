@@ -15,8 +15,10 @@ This report documents the systematic ablation experiments conducted on the model
 | Model | F1-Macro (Balanced Baseline) | F1-Macro (Unbalanced Ablation) | Impact |
 | :--- | :---: | :---: | :---: |
 | lightgbm | 0.706019 | 0.398107 | -0.307912 |
-| xgboost | 0.704558 | 0.386246 | -0.318312 |
+| xgboost | 0.705736 | 0.385628 | -0.320109 |
 | catboost | 0.675599 | 0.421820 | -0.253779 |
+| decision_tree | 0.767083 | 0.395383 | -0.371701 |
+| logistic_regression | 0.346033 | 0.416457 | +0.070424 |
 
 ### Analysis & Answers
 
@@ -38,8 +40,10 @@ This report documents the systematic ablation experiments conducted on the model
 | Model | F1-Macro (Temporal Split Baseline) | F1-Macro (Random Split Ablation) | Difference (Optimistic Bias) |
 | :--- | :---: | :---: | :---: |
 | lightgbm | 0.999950 | 0.999983 | +0.000033 |
-| xgboost | 0.999400 | 1.000000 | +0.000600 |
+| xgboost | 0.999817 | 1.000000 | +0.000183 |
 | catboost | 0.999967 | 1.000000 | +0.000033 |
+| decision_tree | 0.339654 | 0.998468 | +0.658814 |
+| logistic_regression | 0.999833 | 0.998939 | -0.000894 |
 
 ### Analysis & Answers
 
@@ -61,8 +65,10 @@ This report documents the systematic ablation experiments conducted on the model
 | Model | F1-Macro (All Features Baseline) | F1-Macro (No Rates Ablation) | Impact |
 | :--- | :---: | :---: | :---: |
 | lightgbm | 0.706019 | 0.372553 | -0.333466 |
-| xgboost | 0.704558 | 0.373492 | -0.331066 |
+| xgboost | 0.705736 | 0.373478 | -0.332258 |
 | catboost | 0.675599 | 0.390447 | -0.285152 |
+| decision_tree | 0.767083 | 0.373078 | -0.394006 |
+| logistic_regression | 0.346033 | 0.488402 | +0.142369 |
 
 ### Analysis & Answers
 
